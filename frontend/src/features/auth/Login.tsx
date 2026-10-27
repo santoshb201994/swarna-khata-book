@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, ArrowRight, ShieldCheck, Store, UserPlus, Building2 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Store, UserPlus, Building2, Eye, EyeOff } from 'lucide-react';
 import api from '../../api/client';
 import { PasswordPolicyChecklist } from '../../components/PasswordPolicyChecklist';
 import { validatePasswordPolicy } from '../../utils/passwordPolicy';
@@ -10,8 +10,9 @@ export const Login: React.FC = () => {
   const [activePersona, setActivePersona] = useState<'store_login' | 'register_store'>('store_login');
   
   // Login fields
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
@@ -19,6 +20,7 @@ export const Login: React.FC = () => {
   const [regShopName, setRegShopName] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regAddress, setRegAddress] = useState('');
@@ -61,7 +63,7 @@ export const Login: React.FC = () => {
       const { access, refresh, schema_name } = res.data;
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
-      localStorage.setItem('x_tenant_schema', schema_name);
+      localStorage.setItem('tenant_schema', schema_name);
 
       // Fetch user profile
       try {
@@ -156,14 +158,29 @@ export const Login: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Password
               </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
-                placeholder="••••••••"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 focus:outline-hidden cursor-pointer p-1"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-slate-500" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-slate-400" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button
@@ -256,14 +273,29 @@ export const Login: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Owner Password *
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
-                  placeholder="e.g. Gold*Vault8"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type={showRegPassword ? 'text' : 'password'}
+                    required
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    className="w-full px-3.5 py-2 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="e.g. Gold*Vault8"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    className="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-hidden cursor-pointer p-1"
+                    title={showRegPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showRegPassword ? (
+                      <EyeOff className="w-4 h-4 text-slate-500" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

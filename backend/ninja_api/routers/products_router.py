@@ -64,6 +64,7 @@ def list_categories(request):
 
 @router.post("/categories/", response={201: CategoryOut, 400: dict}, auth=jwt_auth)
 def create_category(request, payload: CategoryIn):
+    require_role(request.auth, ['owner', 'manager'])
     if Category.objects.filter(name__iexact=payload.name).exists():
         return 400, {"error": f"Category '{payload.name}' already exists."}
     cat = Category.objects.create(name=payload.name, description=payload.description)
@@ -77,6 +78,7 @@ def list_purities(request):
 
 @router.post("/purities/", response={201: PurityOut, 400: dict}, auth=jwt_auth)
 def create_purity(request, payload: PurityIn):
+    require_role(request.auth, ['owner', 'manager'])
     if Purity.objects.filter(name__iexact=payload.name).exists():
         return 400, {"error": f"Purity '{payload.name}' already exists."}
     purity = Purity.objects.create(name=payload.name, fineness=payload.fineness)
@@ -98,9 +100,12 @@ def list_products(
     """
     Search and list products with optional filters on SKU, name, purity, category.
     """
-    qs = Product.objects.select_related('category', 'purity', 'branch', 'qr_tag').all()
-    if is_active is not None:
-        qs = qs.filter(is_active=is_active)
+    qs = Product.objects.select_related('category', 'purity', 'branch', 'qr_tag', 'stock_summary').all()
+    if is_active is True:
+        # Shop inventory strictly excludes sold or depleted items (quantity_on_hand <= 0)
+        qs = qs.filter(is_active=True).exclude(stock_summary__quantity_on_hand__lte=0)
+    elif is_active is False:
+        qs = qs.filter(Q(is_active=False) | Q(stock_summary__quantity_on_hand__lte=0))
     if category_id:
         qs = qs.filter(category_id=category_id)
     if purity_id:
@@ -126,6 +131,15 @@ def list_products(
         except Exception:
             pass
 
+        raw_status = item_status_map.get(prod.sku)
+        stock_qty = getattr(getattr(prod, 'stock_summary', None), 'quantity_on_hand', None)
+        if (stock_qty is not None and stock_qty <= 0) or not prod.is_active or raw_status == 'SOLD':
+            effective_status = 'SOLD'
+        elif raw_status == 'IN_CART':
+            effective_status = 'IN_CART'
+        else:
+            effective_status = 'AVAILABLE'
+
         results.append({
             "id": prod.id,
             "name": prod.name,
@@ -143,8 +157,8 @@ def list_products(
             "huid": prod.huid,
             "photo_url": photo_url,
             "qr_code_url": qr_url,
-            "item_status": item_status_map.get(prod.sku, 'AVAILABLE'),
-            "is_active": prod.is_active,
+            "item_status": effective_status,
+            "is_active": prod.is_active and (stock_qty is None or stock_qty > 0),
             "created_at": prod.created_at,
         })
     return results
@@ -153,12 +167,13 @@ def list_products(
 @router.post("/products/", response={201: ProductOut, 400: dict}, auth=jwt_auth)
 def create_product(request, payload: ProductIn):
     """
-    Create a new jewellery product.
+    Create a new jewellery product (Owner / Manager only).
     Automatically:
     - Generates unique QR Tag
     - Registers into authoritative Item inventory for QR scanning & billing
     - Records initial inventory stock if initial_stock > 0
     """
+    require_role(request.auth, ['owner', 'manager'])
     if Product.objects.filter(sku__iexact=payload.sku).exists():
         return 400, {"error": f"Product with SKU '{payload.sku}' already exists."}
 
@@ -231,6 +246,7 @@ def get_product(request, product_id: int):
 
 @router.put("/products/{product_id}/", response={200: ProductOut, 400: dict}, auth=jwt_auth)
 def update_product(request, product_id: int, payload: ProductUpdateIn):
+    require_role(request.auth, ['owner', 'manager'])
     prod = get_object_or_404(Product, id=product_id)
 
     if payload.name is not None:
@@ -282,8 +298,26 @@ def delete_product(request, product_id: int):
 
 @router.post("/products/{product_id}/upload-photo/", response={200: ProductOut, 400: dict}, auth=jwt_auth)
 def upload_photo(request, product_id: int, photo: UploadedFile = File(...)):
-    """Upload product photograph."""
+    """Upload product photograph with strict validation (Owner / Manager only)."""
+    require_role(request.auth, ['owner', 'manager'])
     prod = get_object_or_404(Product, id=product_id)
+
+    # 1. Size constraint (Max 5MB)
+    if photo.size > 5 * 1024 * 1024:
+        return 400, {"error": "Photo file exceeds maximum allowable size of 5MB."}
+
+    # 2. Whitelist Content-Type
+    allowed_content_types = {'image/jpeg', 'image/png', 'image/webp'}
+    if photo.content_type not in allowed_content_types:
+        return 400, {"error": "Invalid image format. Allowed formats: JPEG, PNG, WEBP."}
+
+    # 3. Whitelist file extensions
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
+    import os
+    ext = os.path.splitext(photo.name)[1].lower()
+    if ext not in allowed_extensions:
+        return 400, {"error": f"Disallowed file extension '{ext}'. Only .jpg, .jpeg, .png, .webp allowed."}
+
     prod.photo = photo
     prod.save()
     generate_qr_for_product(prod)
@@ -293,7 +327,8 @@ def upload_photo(request, product_id: int, photo: UploadedFile = File(...)):
 
 @router.post("/products/{product_id}/regenerate-qr/", response={200: QRTagOut}, auth=jwt_auth)
 def regenerate_product_qr(request, product_id: int):
-    """Force re-generate the QR code image for a product."""
+    """Force re-generate the QR code image for a product (Owner / Manager only)."""
+    require_role(request.auth, ['owner', 'manager'])
     prod = get_object_or_404(Product, id=product_id)
     tag = generate_qr_for_product(prod)
     qr_url = request.build_absolute_uri(tag.qr_image.url) if tag.qr_image else None

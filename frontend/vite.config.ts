@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    basicSsl(),
+    ...(process.env.VITE_SSL === 'true' ? [basicSsl()] : []),
   ],
   resolve: {
     alias: {
@@ -16,21 +16,22 @@ export default defineConfig({
     },
   },
   server: {
-    host: true,
+    host: '127.0.0.1',
     port: 5173,
+    allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
       '/media': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         ws: true,
         changeOrigin: true,
       },

@@ -54,6 +54,8 @@ def start_pairing_session(user, base_url: str = None) -> dict:
     session_id = str(uuid.uuid4())
     pairing_code = secrets.token_urlsafe(16)
     expires_at = timezone.now() + timedelta(minutes=PAIRING_TOKEN_LIFETIME_MINUTES)
+    from django.db import connection
+    current_schema = getattr(user, 'tenant_schema', None) or getattr(connection, 'schema_name', 'public')
 
     session = POSPairingSession.objects.create(
         session_id=session_id,
@@ -77,7 +79,7 @@ def start_pairing_session(user, base_url: str = None) -> dict:
     if clean_base_url.startswith('http://') and ':5173' in clean_base_url:
         clean_base_url = 'https://' + clean_base_url[len('http://'):]
 
-    scanner_url = f"{clean_base_url}/scanner?session_id={session_id}&code={pairing_code}"
+    scanner_url = f"{clean_base_url}/scanner?session_id={session_id}&code={pairing_code}&tenant={current_schema}"
     qr_data_url = generate_pairing_qr_data_url(scanner_url)
 
     return {
@@ -86,64 +88,78 @@ def start_pairing_session(user, base_url: str = None) -> dict:
         "scanner_url": scanner_url,
         "qr_data_url": qr_data_url,
         "detected_lan_ip": lan_ip,
+        "tenant_schema": current_schema,
         "expires_at": expires_at.isoformat(),
         "expires_in_seconds": PAIRING_TOKEN_LIFETIME_MINUTES * 60,
         "branch_name": session.branch.name if session.branch else "Main Store",
     }
 
 
-def redeem_pairing_code(session_id: str, pairing_code: str, device_info: str = "") -> dict:
+def redeem_pairing_code(session_id: str, pairing_code: str, device_info: str = "", tenant_schema: str = None) -> dict:
     """Atomically redeems a single-use pairing code and returns a scoped mobile session token"""
-    with transaction.atomic():
-        session = (
-            POSPairingSession.objects.select_for_update()
-            .filter(
-                session_id=session_id,
-                pairing_code=pairing_code,
-                is_active=True,
-                is_redeemed=False,
-                expires_at__gt=timezone.now(),
+    from django_tenants.utils import schema_context
+    from django.db import connection
+    current_schema = tenant_schema or getattr(connection, 'schema_name', 'public')
+
+    def _execute_redeem():
+        with transaction.atomic():
+            session = (
+                POSPairingSession.objects.select_for_update()
+                .filter(
+                    session_id=session_id,
+                    pairing_code=pairing_code,
+                    is_active=True,
+                    is_redeemed=False,
+                    expires_at__gt=timezone.now(),
+                )
+                .first()
             )
-            .first()
-        )
 
-        if not session:
-            # Check if already redeemed
-            already_redeemed = POSPairingSession.objects.filter(
-                session_id=session_id, pairing_code=pairing_code, is_redeemed=True
-            ).exists()
-            if already_redeemed:
-                raise ValueError("This pairing code has already been used.")
-            raise ValueError("Invalid or expired pairing code.")
+            if not session:
+                # Check if already redeemed
+                already_redeemed = POSPairingSession.objects.filter(
+                    session_id=session_id, pairing_code=pairing_code, is_redeemed=True
+                ).exists()
+                if already_redeemed:
+                    raise ValueError("This pairing code has already been used.")
+                raise ValueError("Invalid or expired pairing code.")
 
-        # Consume code atomically on first redemption and extend session for 12 hours
-        session.is_redeemed = True
-        session.redeemed_at = timezone.now()
-        session.expires_at = timezone.now() + timedelta(hours=MOBILE_TOKEN_LIFETIME_HOURS)
-        session.mobile_device_info = (device_info or "Mobile Browser")[:255]
-        session.save(update_fields=['is_redeemed', 'redeemed_at', 'expires_at', 'mobile_device_info'])
+            # Consume code atomically on first redemption and extend session for 12 hours
+            session.is_redeemed = True
+            session.redeemed_at = timezone.now()
+            session.expires_at = timezone.now() + timedelta(hours=MOBILE_TOKEN_LIFETIME_HOURS)
+            session.mobile_device_info = (device_info or "Mobile Browser")[:255]
+            session.save(update_fields=['is_redeemed', 'redeemed_at', 'expires_at', 'mobile_device_info'])
 
-    # Issue scoped temporary mobile token
-    exp = timezone.now() + timedelta(hours=MOBILE_TOKEN_LIFETIME_HOURS)
-    payload = {
-        "sub": f"mobile_scanner_{session.session_id}",
-        "session_id": session.session_id,
-        "user_id": session.user_id,
-        "branch_id": session.branch_id,
-        "role": "mobile_scanner",
-        "exp": int(exp.timestamp()),
-        "iat": int(timezone.now().timestamp()),
-    }
-    mobile_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+            # Issue scoped temporary mobile token
+            exp = timezone.now() + timedelta(hours=MOBILE_TOKEN_LIFETIME_HOURS)
+            payload = {
+                "sub": f"mobile_scanner_{session.session_id}",
+                "session_id": session.session_id,
+                "user_id": session.user_id,
+                "branch_id": session.branch_id,
+                "role": "mobile_scanner",
+                "tenant_schema": current_schema,
+                "exp": int(exp.timestamp()),
+                "iat": int(timezone.now().timestamp()),
+            }
+            jwt_secret = getattr(settings, 'JWT_SECRET_KEY', settings.SECRET_KEY)
+            mobile_token = jwt.encode(payload, jwt_secret, algorithm="HS256")
 
-    return {
-        "status": "paired",
-        "session_id": session.session_id,
-        "mobile_token": mobile_token,
-        "user_name": session.user.get_full_name() or session.user.username,
-        "branch_name": session.branch.name if session.branch else "Main Store",
-        "expires_at": exp.isoformat(),
-    }
+            return {
+                "status": "paired",
+                "session_id": session.session_id,
+                "mobile_token": mobile_token,
+                "tenant_schema": current_schema,
+                "user_name": session.user.get_full_name() or session.user.username,
+                "branch_name": session.branch.name if session.branch else "Main Store",
+                "expires_at": exp.isoformat(),
+            }
+
+    if tenant_schema and tenant_schema != 'public':
+        with schema_context(tenant_schema):
+            return _execute_redeem()
+    return _execute_redeem()
 
 
 def revoke_pairing_session(session_id: str, user) -> bool:
@@ -159,12 +175,19 @@ def revoke_pairing_session(session_id: str, user) -> bool:
 def verify_mobile_token(token: str) -> dict:
     """Verifies and decodes a mobile scanner JWT token"""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        jwt_secret = getattr(settings, 'JWT_SECRET_KEY', settings.SECRET_KEY)
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
         if payload.get("role") != "mobile_scanner":
             return None
         return payload
     except Exception:
-        return None
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            if payload.get("role") != "mobile_scanner":
+                return None
+            return payload
+        except Exception:
+            return None
 
 
 def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payload: str) -> tuple[dict | None, str | None, bool]:

@@ -35,6 +35,14 @@ class TenantIsolationTestCase(TestCase):
             cls.tenant2.save()
             Domain.objects.create(domain='kalyan.localhost', tenant=cls.tenant2, is_primary=True)
 
+        with schema_context('public'):
+            cls.superadmin, _ = User.objects.get_or_create(
+                username='isolation_superadmin',
+                defaults={'is_superuser': True, 'role': 'superadmin'}
+            )
+            from ninja_api.auth import create_token
+            cls.super_tok = create_token(cls.superadmin, token_type='access')
+
     def test_tenant_data_isolation(self):
         """
         Verify that inventory created in Tenant 1 does not leak into Tenant 2.
@@ -88,5 +96,12 @@ class TenantIsolationTestCase(TestCase):
         Verify tenant routing via 'X-Tenant' HTTP header.
         """
         client = TestClient()
-        response = client.get('/api/tenants/', HTTP_X_TENANT='tenant_swarna')
+        unauth_resp = client.get('/api/tenants/', HTTP_X_TENANT='tenant_swarna')
+        self.assertEqual(unauth_resp.status_code, 401)
+
+        response = client.get(
+            '/api/tenants/',
+            HTTP_X_TENANT='tenant_swarna',
+            HTTP_AUTHORIZATION=f'Bearer {self.super_tok}'
+        )
         self.assertEqual(response.status_code, 200)

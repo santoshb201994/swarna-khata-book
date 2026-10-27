@@ -31,10 +31,16 @@ api.interceptors.response.use(
           if (!refreshPromise) {
             refreshPromise = (async () => {
               try {
-                const { data } = await axios.post('/api/auth/token/refresh/', { refresh })
+                const currentTenant = localStorage.getItem('tenant_schema') || 'demo'
+                const { data } = await axios.post('/api/auth/token/refresh/', { refresh }, {
+                  headers: { 'X-Tenant': currentTenant }
+                })
                 localStorage.setItem('access_token', data.access)
                 if (data.refresh) {
                   localStorage.setItem('refresh_token', data.refresh)
+                }
+                if (data.tenant_schema) {
+                  localStorage.setItem('tenant_schema', data.tenant_schema)
                 }
                 return data.access
               } finally {

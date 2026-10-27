@@ -36,6 +36,47 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleCategoryChange = (newCatId: number) => {
+    setCategoryId(newCatId);
+    const cat = categories.find((c) => c.id === newCatId);
+    if (cat) {
+      const catName = cat.name.toLowerCase();
+      if (/silver|chandi/i.test(catName)) {
+        const silverPurity = purities.find((p) => /silver|925|chandi/i.test(p.name));
+        if (silverPurity) {
+          setPurityId(silverPurity.id);
+          if (makingCharge === '450.00') setMakingCharge('15.00');
+        }
+      } else if (/platinum|\bpt\b/i.test(catName)) {
+        const platPurity = purities.find((p) => /platinum|950/i.test(p.name));
+        if (platPurity) setPurityId(platPurity.id);
+      } else if (/gold/i.test(catName)) {
+        const goldPurity = purities.find((p) => /22kt|916/i.test(p.name)) || purities[0];
+        if (goldPurity) setPurityId(goldPurity.id);
+      }
+    }
+  };
+
+  const handleNameChange = (newName: string) => {
+    setName(newName);
+    if (/silver|payal|anklet/i.test(newName)) {
+      const silverCat = categories.find((c) => /silver/i.test(c.name));
+      const silverPurity = purities.find((p) => /silver|925|chandi/i.test(p.name));
+      const curPurity = purities.find((p) => p.id === purityId);
+      if (curPurity && !/silver|925|chandi/i.test(curPurity.name) && silverPurity) {
+        setPurityId(silverPurity.id);
+        if (silverCat) setCategoryId(silverCat.id);
+        if (makingCharge === '450.00') setMakingCharge('15.00');
+      }
+    }
+  };
+
+  const selectedPurity = purities.find((p) => p.id === purityId);
+  const selectedCat = categories.find((c) => c.id === categoryId);
+  const isSilverItem = /silver|925|chandi|payal|anklet/i.test(`${selectedPurity?.name || ''} ${selectedCat?.name || ''} ${name}`);
+  const isPlatItem = /platinum|950|\bpt\b/i.test(`${selectedPurity?.name || ''} ${selectedCat?.name || ''} ${name}`);
+  const detectedMetalName = isSilverItem ? 'Silver' : isPlatItem ? 'Platinum' : 'Gold';
+
   useEffect(() => {
     if (categories.length > 0 && (!categoryId || !categories.some((c) => c.id === categoryId))) {
       setCategoryId(categories[0].id);
@@ -211,9 +252,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 22KT Antique Bridal Choker"
+                  placeholder="e.g. 22KT Antique Bridal Choker or Silver Payal"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 />
               </div>
@@ -241,35 +282,55 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
 
             {/* Category & Purity */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => handleCategoryChange(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Purity *</label>
+                  <select
+                    value={purityId}
+                    onChange={(e) => setPurityId(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                  >
+                    {purities.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Purity *</label>
-                <select
-                  value={purityId}
-                  onChange={(e) => setPurityId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-                >
-                  {purities.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+              {/* Dynamic Metal Classification Badge */}
+              <div
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-colors ${
+                  isSilverItem
+                    ? 'bg-slate-100 text-slate-800 border border-slate-200'
+                    : isPlatItem
+                    ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                    : 'bg-amber-50 text-amber-900 border border-amber-200'
+                }`}
+              >
+                <span>
+                  Metal Classification: <b className="uppercase">{detectedMetalName}</b> ({selectedPurity?.name || 'Standard'})
+                </span>
+                <span className="text-[11px] opacity-80 font-mono">
+                  Billed at {detectedMetalName} rate in POS
+                </span>
               </div>
             </div>
 

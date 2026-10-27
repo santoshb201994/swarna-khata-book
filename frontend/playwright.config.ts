@@ -8,14 +8,14 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'https://localhost:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173',
     ignoreHTTPSErrors: true,
     trace: 'on-first-retry',
     headless: true,
   },
   webServer: {
     command: 'npm run dev',
-    url: 'https://localhost:5173',
+    url: 'http://127.0.0.1:5173',
     ignoreHTTPSErrors: true,
     reuseExistingServer: true,
     timeout: 30000,

@@ -48,20 +48,27 @@ def list_stock_movements(
 @router.post("/stock-movements/", response={201: StockMovementOut, 400: dict}, auth=jwt_auth)
 def create_stock_movement(request, payload: StockMovementIn):
     """
-    Record an atomic stock adjustment or receipt.
+    Record an atomic stock adjustment or receipt (Owner / Manager only).
     Locks the row in StockSummary during execution to prevent concurrency anomalies.
     """
+    require_role(request.auth, ['owner', 'manager'])
+    if payload.quantity <= 0:
+        return 400, {"error": "Quantity must be greater than zero."}
+
     prod = get_object_or_404(Product, id=payload.product_id)
-    movement = record_stock_movement(
-        product=prod,
-        movement_type=payload.movement_type,
-        quantity=payload.quantity,
-        reference_type=payload.reference_type or 'manual',
-        reference_id=payload.reference_id,
-        note=payload.note or '',
-        user=request.auth,
-        branch=request.auth.branch if request.auth else None,
-    )
+    try:
+        movement = record_stock_movement(
+            product=prod,
+            movement_type=payload.movement_type,
+            quantity=payload.quantity,
+            reference_type=payload.reference_type or 'manual',
+            reference_id=payload.reference_id,
+            note=payload.note or '',
+            user=request.auth,
+            branch=request.auth.branch if request.auth else None,
+        )
+    except ValueError as e:
+        return 400, {"error": str(e)}
 
     created_by_name = request.auth.get_full_name() or request.auth.username if request.auth else 'System'
     return 201, {

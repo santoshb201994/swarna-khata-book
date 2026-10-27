@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
+  developerLogin: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -31,9 +32,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     const res = await api.post('/auth/token/', { username, password });
+    const { access, refresh, user: userData, tenant_schema } = res.data;
+    localStorage.setItem('access_token', access);
+    if (refresh) localStorage.setItem('refresh_token', refresh);
+    if (tenant_schema) localStorage.setItem('tenant_schema', tenant_schema);
+    localStorage.setItem('user_info', JSON.stringify(userData));
+    setToken(access);
+    setUser(userData);
+  };
+
+  const developerLogin = async (username: string, password: string) => {
+    const res = await api.post('/developer/login/', { username, password });
     const { access, refresh, user: userData } = res.data;
     localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
+    if (refresh) localStorage.setItem('refresh_token', refresh);
+    localStorage.setItem('tenant_schema', 'public');
     localStorage.setItem('user_info', JSON.stringify(userData));
     setToken(access);
     setUser(userData);
@@ -57,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, developerLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

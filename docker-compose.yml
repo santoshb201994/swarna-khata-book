@@ -5,8 +5,8 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: swarna_khata
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_USER: erp_admin
+      POSTGRES_PASSWORD: GoldShop@2026#Db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

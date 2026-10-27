@@ -25,12 +25,14 @@ class UserInfo(BaseModel):
     email: Optional[str] = ''
     role: str
     branch_id: Optional[int] = None
+    tenant_schema: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
     access: str
     refresh: Optional[str] = None
     user: Optional[UserInfo] = None
+    tenant_schema: Optional[str] = None
 
 
 class UserCreateIn(BaseModel):
@@ -127,6 +129,7 @@ class UserDetailOut(BaseModel):
     phone: Optional[str] = ''
     branch_id: Optional[int] = None
     branch_name: Optional[str] = None
+    tenant_schema: Optional[str] = None
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
@@ -187,27 +190,27 @@ class ProductIn(BaseModel):
     sku: str
     category_id: int
     purity_id: int
-    gross_weight: Decimal = Field(..., max_digits=10, decimal_places=3)
-    stone_weight: Decimal = Field(default=Decimal('0.000'), max_digits=10, decimal_places=3)
-    other_weight: Decimal = Field(default=Decimal('0.000'), max_digits=10, decimal_places=3)
+    gross_weight: Decimal = Field(..., gt=0, max_digits=10, decimal_places=3)
+    stone_weight: Decimal = Field(default=Decimal('0.000'), ge=0, max_digits=10, decimal_places=3)
+    other_weight: Decimal = Field(default=Decimal('0.000'), ge=0, max_digits=10, decimal_places=3)
     making_charge_type: str = 'per_gram'
-    making_charge_value: Decimal = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2)
+    making_charge_value: Decimal = Field(default=Decimal('0.00'), ge=0, max_digits=10, decimal_places=2)
     description: Optional[str] = ''
     hsn_code: Optional[str] = '7113'
     huid: Optional[str] = ''
     branch_id: Optional[int] = None
-    initial_stock: int = 1
+    initial_stock: int = Field(default=1, ge=0)
 
 
 class ProductUpdateIn(BaseModel):
     name: Optional[str] = None
     category_id: Optional[int] = None
     purity_id: Optional[int] = None
-    gross_weight: Optional[Decimal] = None
-    stone_weight: Optional[Decimal] = None
-    other_weight: Optional[Decimal] = None
+    gross_weight: Optional[Decimal] = Field(default=None, gt=0, max_digits=10, decimal_places=3)
+    stone_weight: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=3)
+    other_weight: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=3)
     making_charge_type: Optional[str] = None
-    making_charge_value: Optional[Decimal] = None
+    making_charge_value: Optional[Decimal] = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     description: Optional[str] = None
     hsn_code: Optional[str] = None
     huid: Optional[str] = None
@@ -272,7 +275,7 @@ class ProductListOut(BaseModel):
 class StockMovementIn(BaseModel):
     product_id: int
     movement_type: str  # 'IN', 'OUT', 'RETURN', 'EXCHANGE', 'ADJUSTMENT'
-    quantity: int = 1
+    quantity: int = Field(default=1, gt=0, le=100000)
     reference_type: Optional[str] = ''
     reference_id: Optional[int] = None
     note: Optional[str] = ''
@@ -312,15 +315,15 @@ class StockSummaryOut(BaseModel):
 
 class SaleItemIn(BaseModel):
     product_id: int
-    quantity: int = 1
-    gold_rate_per_gram: Decimal = Field(..., max_digits=10, decimal_places=2)
-    making_charge: Decimal = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2)
-    stone_charge: Decimal = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2)
+    quantity: int = Field(default=1, gt=0, le=10000)
+    gold_rate_per_gram: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
+    making_charge: Decimal = Field(default=Decimal('0.00'), ge=0, max_digits=10, decimal_places=2)
+    stone_charge: Decimal = Field(default=Decimal('0.00'), ge=0, max_digits=10, decimal_places=2)
 
 
 class PaymentIn(BaseModel):
     method: str  # 'cash', 'upi', 'card', 'cheque', 'old_gold'
-    amount: Decimal = Field(..., max_digits=12, decimal_places=2)
+    amount: Decimal = Field(..., gt=0, max_digits=12, decimal_places=2)
     reference: Optional[str] = ''
     note: Optional[str] = ''
 
@@ -331,9 +334,9 @@ class SaleCreateIn(BaseModel):
     # Primary payment or split payments
     payment: Optional[PaymentIn] = None
     payments: Optional[List[PaymentIn]] = None
-    discount: Decimal = Field(default=Decimal('0.00'), max_digits=12, decimal_places=2)
-    old_gold_weight: Decimal = Field(default=Decimal('0.000'), max_digits=10, decimal_places=3)
-    old_gold_rate: Decimal = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2)
+    discount: Decimal = Field(default=Decimal('0.00'), ge=0, max_digits=12, decimal_places=2)
+    old_gold_weight: Decimal = Field(default=Decimal('0.000'), ge=0, max_digits=10, decimal_places=3)
+    old_gold_rate: Decimal = Field(default=Decimal('0.00'), ge=0, max_digits=10, decimal_places=2)
     notes: Optional[str] = ''
 
 
@@ -343,6 +346,7 @@ class SaleItemOut(BaseModel):
     product_name: str
     sku: str
     purity: str
+    quantity: int = 1
     gross_weight: Decimal
     net_weight: Decimal
     gold_rate_per_gram: Decimal
@@ -352,6 +356,8 @@ class SaleItemOut(BaseModel):
     total_price: Decimal
     hsn_code: str
     gst_rate: Decimal
+    huid: Optional[str] = ''
+    wastage_percent: Optional[Decimal] = Decimal('0.00')
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -367,11 +373,106 @@ class PaymentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InvoiceSettingOut(BaseModel):
+    id: int
+    branch_id: int
+    header_invocation: str = ''
+    shop_name_primary: str
+    shop_name_secondary: str = ''
+    tagline: str = ''
+    address_primary: str
+    address_secondary: str = ''
+    phone_landline: str = ''
+    phone_mobile_1: str = ''
+    phone_mobile_2: str = ''
+    email: str = ''
+    website: str = ''
+    gstin: str
+    pan_number: str = ''
+    state_name: str
+    state_code: str
+    bis_hallmark_licence: str = ''
+    logo_url: str = ''
+    template_style: str
+    default_paper_size: str
+    show_invocation: bool = True
+    show_bilingual_header: bool = True
+    show_huid: bool = True
+    show_purity: bool = True
+    show_gross_net_weight: bool = True
+    show_wastage: bool = True
+    show_making_charge: bool = True
+    show_stone_details: bool = True
+    show_rate_per_gram: bool = True
+    show_old_gold_section: bool = True
+    show_upi_qr: bool = True
+    show_bank_details: bool = True
+    show_customer_address: bool = True
+    show_hallmark_badge: bool = True
+    bank_name: str = ''
+    account_name: str = ''
+    account_number: str = ''
+    ifsc_code: str = ''
+    upi_id: str = ''
+    terms_and_conditions: str
+    declaration: str
+    signatory_title: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InvoiceSettingUpdateIn(BaseModel):
+    header_invocation: Optional[str] = None
+    shop_name_primary: Optional[str] = None
+    shop_name_secondary: Optional[str] = None
+    tagline: Optional[str] = None
+    address_primary: Optional[str] = None
+    address_secondary: Optional[str] = None
+    phone_landline: Optional[str] = None
+    phone_mobile_1: Optional[str] = None
+    phone_mobile_2: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    gstin: Optional[str] = None
+    pan_number: Optional[str] = None
+    state_name: Optional[str] = None
+    state_code: Optional[str] = None
+    bis_hallmark_licence: Optional[str] = None
+    logo_url: Optional[str] = None
+    template_style: Optional[str] = None
+    default_paper_size: Optional[str] = None
+    show_invocation: Optional[bool] = None
+    show_bilingual_header: Optional[bool] = None
+    show_huid: Optional[bool] = None
+    show_purity: Optional[bool] = None
+    show_gross_net_weight: Optional[bool] = None
+    show_wastage: Optional[bool] = None
+    show_making_charge: Optional[bool] = None
+    show_stone_details: Optional[bool] = None
+    show_rate_per_gram: Optional[bool] = None
+    show_old_gold_section: Optional[bool] = None
+    show_upi_qr: Optional[bool] = None
+    show_bank_details: Optional[bool] = None
+    show_customer_address: Optional[bool] = None
+    show_hallmark_badge: Optional[bool] = None
+    bank_name: Optional[str] = None
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    upi_id: Optional[str] = None
+    terms_and_conditions: Optional[str] = None
+    declaration: Optional[str] = None
+    signatory_title: Optional[str] = None
+
+
 class SaleOut(BaseModel):
     id: int
     invoice_number: str
     customer_id: Optional[int] = None
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_address: Optional[str] = None
+    customer_pan: Optional[str] = None
     branch_id: Optional[int] = None
     sale_date: datetime
     gold_rate_per_gram: Decimal
@@ -389,6 +490,10 @@ class SaleOut(BaseModel):
     notes: Optional[str] = ''
     items: List[SaleItemOut] = []
     payments: List[PaymentOut] = []
+    invoice_setting: Optional[InvoiceSettingOut] = None
+    shop_snapshot: Optional[dict] = {}
+    customer_snapshot: Optional[dict] = {}
+    pdf_sha256: Optional[str] = ''
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -410,7 +515,7 @@ class SaleListOut(BaseModel):
 
 class AddPaymentIn(BaseModel):
     method: str
-    amount: Decimal = Field(..., max_digits=12, decimal_places=2)
+    amount: Decimal = Field(..., gt=0, max_digits=12, decimal_places=2)
     reference: Optional[str] = ''
     note: Optional[str] = ''
 
@@ -420,7 +525,8 @@ class AddPaymentIn(BaseModel):
 # ==============================================================================
 
 class GoldRateIn(BaseModel):
-    purity_id: int
+    purity_id: Optional[int] = None
+    purity: Optional[int] = None
     rate_per_gram: Decimal = Field(..., max_digits=10, decimal_places=2)
     effective_date: Optional[date] = None
     is_current: bool = True
@@ -429,6 +535,7 @@ class GoldRateIn(BaseModel):
 class GoldRateOut(BaseModel):
     id: int
     purity_id: int
+    purity: Optional[int] = None
     purity_name: Optional[str] = None
     rate_per_gram: Decimal
     effective_date: date
@@ -518,8 +625,14 @@ class CloseDayIn(BaseModel):
 
 class CashEntryIn(BaseModel):
     entry_type: str  # 'in' or 'out'
-    amount: Decimal = Field(..., max_digits=12, decimal_places=2)
+    amount: Decimal = Field(..., gt=0, max_digits=12, decimal_places=2)
     note: Optional[str] = ''
+
+
+class DayBookPatchIn(BaseModel):
+    cash_in: Optional[Decimal] = None
+    cash_out: Optional[Decimal] = None
+    notes: Optional[str] = None
 
 
 # ==============================================================================
@@ -572,6 +685,7 @@ class RedeemPairingIn(BaseModel):
     session_id: str
     pairing_code: str
     device_info: Optional[str] = ''
+    tenant_schema: Optional[str] = None
 
 
 class RedeemPairingOut(BaseModel):

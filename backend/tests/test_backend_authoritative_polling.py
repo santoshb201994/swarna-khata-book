@@ -35,15 +35,30 @@ class BackendAuthoritativePollingTestCase(TestCase):
             cls.tenant_kalyan.save()
             Domain.objects.create(domain='kalyan.localhost', tenant=cls.tenant_kalyan, is_primary=True)
 
+        from apps.accounts.models import User, Branch
+        from ninja_api.auth import create_token
+        with schema_context(cls.tenant.schema_name):
+            branch, _ = Branch.objects.get_or_create(name='Demo Branch')
+            cls.user, _ = User.objects.get_or_create(
+                username='pos_operator',
+                defaults={'role': 'staff', 'branch': branch}
+            )
+            cls.user_token = create_token(cls.user, token_type='access')
+
     def setUp(self):
         self.client = TestClient()
 
     def test_create_bill_and_scoped_token(self):
-        """Verify POST /api/bills/ creates Bill and returns scoped JWT."""
+        """Verify POST /api/bills/ creates Bill and returns scoped JWT when authenticated."""
         with schema_context(self.tenant.schema_name):
+            # Test unauthenticated rejection
+            unauth_res = self.client.post('/api/bills/', HTTP_X_TENANT='demo')
+            self.assertEqual(unauth_res.status_code, 401)
+
             res = self.client.post(
                 '/api/bills/',
-                HTTP_X_TENANT='demo'
+                HTTP_X_TENANT='demo',
+                HTTP_AUTHORIZATION=f'Bearer {self.user_token}'
             )
             self.assertEqual(res.status_code, 201)
             data = res.json()

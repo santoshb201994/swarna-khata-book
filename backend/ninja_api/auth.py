@@ -14,7 +14,7 @@ def create_token(user: User, token_type: str = 'access') -> str:
     )
     exp = now + lifetime
     from django.db import connection
-    current_schema = getattr(connection, 'schema_name', None)
+    current_schema = getattr(user, 'tenant_schema', None) or getattr(connection, 'schema_name', None)
 
     role = 'superadmin' if (user.is_superuser or user.role == 'superadmin') else user.role
     payload = {
@@ -27,8 +27,10 @@ def create_token(user: User, token_type: str = 'access') -> str:
         'iat': int(now.timestamp()),
         'exp': int(exp.timestamp()),
     }
-    if current_schema and current_schema != 'public':
+    if current_schema:
         payload['tenant_schema'] = current_schema
+    else:
+        payload['tenant_schema'] = 'public'
 
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -51,8 +53,22 @@ def decode_token(token: str, expected_type: str = 'access') -> dict:
 class JWTAuth(HttpBearer):
     """
     Production-grade Bearer Token Authentication for Django Ninja.
-    Extracts Bearer token from HTTP Authorization header and resolves the user in the current tenant schema.
+    Extracts Bearer token from HTTP Authorization header or query parameter ('token'),
+    and resolves the user in the current tenant schema.
     """
+    def __call__(self, request):
+        auth_value = request.headers.get("Authorization")
+        token = None
+        if auth_value:
+            parts = auth_value.split(" ")
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                token = parts[1]
+        if not token:
+            token = request.GET.get("token")
+        if not token:
+            return None
+        return self.authenticate(request, token)
+
     def authenticate(self, request, token):
         payload = decode_token(token, expected_type='access')
         if not payload:
@@ -61,31 +77,32 @@ class JWTAuth(HttpBearer):
         if not user_id:
             return None
 
-        # Ensure database connection matches the user's tenant schema if connection is currently public
+        is_super = bool(payload.get('is_superuser') or payload.get('role') == 'superadmin')
         token_schema = payload.get('tenant_schema')
         from django.db import connection
-        from django_tenants.utils import get_tenant_model
+        from django_tenants.utils import get_tenant_model, schema_context
         curr_schema = getattr(connection, 'schema_name', None)
-        if (not curr_schema or curr_schema == 'public') and token_schema and token_schema != 'public':
-            tenant = get_tenant_model().objects.filter(schema_name=token_schema).first()
-            if tenant:
+
+        # Multi-Tenant Isolation Enforcement:
+        # Route to the tenant schema encoded in the signed token, or public for platform superadmin
+        if token_schema and token_schema != 'public':
+            if curr_schema != token_schema:
+                tenant = get_tenant_model().objects.filter(schema_name=token_schema).first()
+                if not tenant:
+                    return None
                 connection.set_tenant(tenant)
                 request.tenant = tenant
-
-        # If token belongs to platform superadmin, fetch from public schema
-        if payload.get('is_superuser') or payload.get('role') == 'superadmin':
-            from django_tenants.utils import schema_context
+            user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
+        else:
             with schema_context('public'):
                 user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
             if user:
                 user.role = 'superadmin'
-        else:
-            user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
 
         if not user:
             return None
 
-        # Attach user to request for convenience
+        user.tenant_schema = token_schema or getattr(connection, 'schema_name', 'public')
         request.user = user
         return user
 
@@ -166,10 +183,43 @@ class BillJWTAuth(HttpBearer):
 bill_jwt_auth = BillJWTAuth()
 
 
+# ==============================================================================
+# HIERARCHICAL ROLE-BASED ACCESS CONTROL (RBAC)
+# ==============================================================================
+
+ROLE_LEVELS: dict[str, int] = {
+    'superadmin': 100,
+    'owner': 80,
+    'manager': 60,
+    'accountant': 40,
+    'staff': 20,
+}
+
+# Role inheritance: a superior role inherits all capabilities of subordinate roles
+ROLE_HIERARCHY: dict[str, set[str]] = {
+    'superadmin': {'superadmin', 'owner', 'manager', 'accountant', 'staff'},
+    'owner': {'owner', 'manager', 'accountant', 'staff'},
+    'manager': {'manager', 'staff'},
+    'accountant': {'accountant', 'staff'},
+    'staff': {'staff'},
+}
+
+
 def require_role(user: User, allowed_roles: list[str]):
-    """Enforces Role-Based Access Control (RBAC)"""
+    """
+    Enforces Hierarchical Role-Based Access Control (RBAC).
+    A user has access if their active role or any role inherited through the
+    hierarchy is present in allowed_roles.
+    Superusers and platform superadmins possess root access across all roles.
+    """
     if not user or not user.is_authenticated:
         raise PermissionError("Authentication required.")
-    if user.is_superuser or user.role in allowed_roles:
+
+    if user.is_superuser or user.role == 'superadmin':
         return True
+
+    effective_roles = ROLE_HIERARCHY.get(user.role, {user.role})
+    if any(role in effective_roles for role in allowed_roles):
+        return True
+
     raise PermissionError(f"Access denied. Requires one of roles: {', '.join(allowed_roles)}")

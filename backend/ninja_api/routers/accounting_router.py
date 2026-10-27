@@ -2,6 +2,8 @@ from typing import List, Optional
 from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db import transaction
+from django.db.models import Q
 from ninja import Router
 
 from apps.accounting.models import GoldRate, Customer, DayBook, ShopRateSetting
@@ -11,7 +13,7 @@ from apps.accounting.services import sync_rates_from_source
 from ninja_api.auth import jwt_auth, require_role
 from ninja_api.schemas import (
     GoldRateIn, GoldRateOut, CustomerIn, CustomerOut,
-    DayBookOut, CloseDayIn, CashEntryIn,
+    DayBookOut, CloseDayIn, CashEntryIn, DayBookPatchIn,
     RateSourceOut, SyncRatesIn, SyncRatesResponse,
     ShopRateSettingIn, ShopRateSettingOut
 )
@@ -111,18 +113,71 @@ def update_rate_settings(request, payload: ShopRateSettingIn):
 
 @router.get("/gold-rates/current/", response=List[GoldRateOut], auth=jwt_auth)
 def get_current_rates(request):
-    """Get active live gold rates per purity for the current showroom branch."""
-    branch = request.auth.branch if request.auth else None
-    rates = GoldRate.objects.select_related('purity', 'entered_by').filter(is_current=True)
+    """Get active live gold/metal rates per purity for the current showroom branch."""
+    from apps.accounts.models import Branch
+    branch = request.auth.branch if (request.auth and request.auth.branch) else Branch.objects.first()
+    rates_qs = GoldRate.objects.select_related('purity', 'entered_by').filter(is_current=True)
     if branch:
-        rates = rates.filter(branch=branch)
+        rates_for_branch = rates_qs.filter(branch=branch)
+        if rates_for_branch.exists():
+            rates_qs = rates_for_branch
+
+    # Deduplicate: latest effective rate per purity_id
+    deduped = {}
+    for r in rates_qs.order_by('-effective_date', '-created_at'):
+        if r.purity_id not in deduped:
+            deduped[r.purity_id] = r
+
+    # Ensure EVERY configured purity has an active rate.
+    # Checks specific metal keywords in priority order so silver/platinum are never defaulted to gold rates.
+    today = timezone.localdate()
+    purities = Purity.objects.all()
+    default_benchmarks = [
+        ('silver', Decimal('92.00')),
+        ('925', Decimal('92.00')),
+        ('chandi', Decimal('92.00')),
+        ('platinum', Decimal('3200.00')),
+        ('950', Decimal('3200.00')),
+        ('24', Decimal('7450.00')),
+        ('999', Decimal('7450.00')),
+        ('22', Decimal('6830.00')),
+        ('916', Decimal('6830.00')),
+        ('18', Decimal('5590.00')),
+        ('750', Decimal('5590.00')),
+        ('14', Decimal('4350.00')),
+        ('585', Decimal('4350.00')),
+    ]
+    for p in purities:
+        if p.id not in deduped:
+            p_name_lower = p.name.lower()
+            val = Decimal('6830.00')
+            for k, benchmark in default_benchmarks:
+                if k in p_name_lower:
+                    val = benchmark
+                    break
+            created_rate = GoldRate.objects.filter(
+                purity=p,
+                branch=branch,
+                effective_date=today,
+            ).order_by('-created_at').first()
+            if not created_rate:
+                created_rate = GoldRate.objects.create(
+                    purity=p,
+                    branch=branch,
+                    effective_date=today,
+                    rate_per_gram=val,
+                    is_current=True,
+                    entered_by=request.auth
+                )
+            deduped[p.id] = created_rate
 
     results = []
-    for r in rates:
+    for r in deduped.values():
         entered_by = r.entered_by.get_full_name() or r.entered_by.username if r.entered_by else 'Admin'
         results.append({
             "id": r.id,
             "purity_id": r.purity_id,
+            "purity": r.purity_id,
             "purity_name": r.purity.name,
             "rate_per_gram": r.rate_per_gram,
             "effective_date": r.effective_date,
@@ -176,22 +231,32 @@ def create_gold_rate(request, payload: GoldRateIn):
     Restricted to Owner or Manager role.
     """
     require_role(request.auth, ['owner', 'manager'])
-    purity = get_object_or_404(Purity, id=payload.purity_id)
-    eff_date = payload.effective_date or timezone.localdate()
+    pid = payload.purity_id or payload.purity
+    if not pid:
+        return 400, {"error": "purity_id or purity is required."}
 
-    rate = GoldRate.objects.create(
-        purity=purity,
-        rate_per_gram=payload.rate_per_gram,
-        effective_date=eff_date,
-        is_current=payload.is_current,
-        entered_by=request.auth,
-        branch=request.auth.branch if request.auth else None,
-    )
+    purity = get_object_or_404(Purity, id=pid)
+    eff_date = payload.effective_date or timezone.localdate()
+    branch = request.auth.branch if request.auth else None
+
+    with transaction.atomic():
+        if payload.is_current:
+            GoldRate.objects.filter(purity=purity, branch=branch).update(is_current=False)
+
+        rate = GoldRate.objects.create(
+            purity=purity,
+            rate_per_gram=payload.rate_per_gram,
+            effective_date=eff_date,
+            is_current=payload.is_current,
+            entered_by=request.auth,
+            branch=branch,
+        )
 
     entered_by = request.auth.get_full_name() or request.auth.username if request.auth else 'Admin'
     return 201, {
         "id": rate.id,
         "purity_id": rate.purity_id,
+        "purity": rate.purity_id,
         "purity_name": purity.name,
         "rate_per_gram": rate.rate_per_gram,
         "effective_date": rate.effective_date,
@@ -209,23 +274,41 @@ def create_gold_rate(request, payload: GoldRateIn):
 def list_customers(request, search: Optional[str] = None):
     """Search and list customer khata directory."""
     qs = Customer.objects.all()
-    if search:
-        qs = qs.filter(name__icontains=search) | qs.filter(phone__icontains=search) | qs.filter(pan_number__icontains=search)
-    return qs[:100]
+    if search and search.strip():
+        term = search.strip()
+        qs = qs.filter(
+            Q(name__icontains=term) |
+            Q(phone__icontains=term) |
+            Q(pan_number__icontains=term) |
+            Q(address__icontains=term)
+        )
+    return qs.order_by('-id')[:100]
 
 
 @router.post("/customers/", response={201: CustomerOut, 400: dict}, auth=jwt_auth)
 def create_customer(request, payload: CustomerIn):
-    if Customer.objects.filter(phone=payload.phone).exists():
-        return 400, {"error": f"Customer with phone '{payload.phone}' already exists."}
+    phone = payload.phone.strip()
+    name = payload.name.strip()
+    if not name:
+        return 400, {"error": "Customer name is required."}
+    if not phone:
+        return 400, {"error": "Customer phone number is required."}
+
+    existing = Customer.objects.filter(phone=phone).first()
+    if existing:
+        return 400, {
+            "error": f"Customer with phone '{phone}' already exists: {existing.name}.",
+            "existing_customer_id": existing.id,
+            "existing_customer_name": existing.name,
+        }
 
     cust = Customer.objects.create(
-        name=payload.name,
-        phone=payload.phone,
-        email=payload.email or '',
-        address=payload.address or '',
-        pan_number=payload.pan_number or '',
-        aadhar_last4=payload.aadhar_last4 or '',
+        name=name,
+        phone=phone,
+        email=(payload.email or '').strip(),
+        address=(payload.address or '').strip(),
+        pan_number=(payload.pan_number or '').strip().upper(),
+        aadhar_last4=(payload.aadhar_last4 or '').strip(),
     )
     return 201, cust
 
@@ -235,17 +318,28 @@ def get_customer(request, customer_id: int):
     return get_object_or_404(Customer, id=customer_id)
 
 
-@router.put("/customers/{customer_id}/", response=CustomerOut, auth=jwt_auth)
+@router.put("/customers/{customer_id}/", response={200: CustomerOut, 400: dict}, auth=jwt_auth)
 def update_customer(request, customer_id: int, payload: CustomerIn):
     cust = get_object_or_404(Customer, id=customer_id)
-    cust.name = payload.name
-    cust.phone = payload.phone
-    cust.email = payload.email or ''
-    cust.address = payload.address or ''
-    cust.pan_number = payload.pan_number or ''
-    cust.aadhar_last4 = payload.aadhar_last4 or ''
+    name = payload.name.strip()
+    phone = payload.phone.strip()
+    if not name:
+        return 400, {"error": "Customer name is required."}
+    if not phone:
+        return 400, {"error": "Customer phone number is required."}
+
+    existing = Customer.objects.filter(phone=phone).exclude(id=customer_id).first()
+    if existing:
+        return 400, {"error": f"Another customer already has phone '{phone}': {existing.name}."}
+
+    cust.name = name
+    cust.phone = phone
+    cust.email = (payload.email or '').strip()
+    cust.address = (payload.address or '').strip()
+    cust.pan_number = (payload.pan_number or '').strip().upper()
+    cust.aadhar_last4 = (payload.aadhar_last4 or '').strip()
     cust.save()
-    return cust
+    return 200, cust
 
 
 # ==============================================================================
@@ -299,27 +393,6 @@ def list_day_books(request):
     return [_format_daybook(d) for d in qs[:60]]
 
 
-@router.post("/day-book/{day_id}/close/", response={200: DayBookOut, 400: dict}, auth=jwt_auth)
-def close_day_book(request, day_id: int, payload: CloseDayIn):
-    """
-    Close the business daybook cash drawer.
-    Computes closing_balance = opening_balance + cash_in - cash_out and locks entries.
-    """
-    require_role(request.auth, ['owner', 'manager', 'accountant'])
-    day = get_object_or_404(DayBook, id=day_id)
-    if day.is_closed:
-        return 400, {"error": "Day book is already closed for this date."}
-
-    day.closing_balance = day.opening_balance + day.cash_in - day.cash_out
-    day.is_closed = True
-    day.closed_by = request.auth
-    if payload.notes:
-        day.notes = payload.notes
-    day.save()
-
-    return 200, _format_daybook(day)
-
-
 @router.post("/day-book/cash-entry/", response={201: DayBookOut, 400: dict}, auth=jwt_auth)
 def record_petty_cash_entry(request, payload: CashEntryIn):
     """
@@ -327,23 +400,133 @@ def record_petty_cash_entry(request, payload: CashEntryIn):
     """
     today = timezone.localdate()
     branch = request.auth.branch if request.auth else None
-    day, _ = DayBook.objects.get_or_create(
-        date=today, branch=branch,
-        defaults={'opening_balance': Decimal('0.00')}
-    )
-    if day.is_closed:
-        return 400, {"error": "Day book is already closed for today. Cannot post further cash entries."}
 
     amount = payload.amount.quantize(Decimal('0.01'))
-    if payload.entry_type == 'in':
-        day.cash_in += amount
-    elif payload.entry_type == 'out':
-        day.cash_out += amount
-    else:
+    if amount <= Decimal('0.00'):
+        return 400, {"error": "Amount must be greater than zero."}
+
+    if payload.entry_type not in ('in', 'out'):
         return 400, {"error": "entry_type must be 'in' or 'out'"}
 
-    if payload.note:
-        day.notes = f"{day.notes}\n[{timezone.now().strftime('%H:%M')}] {payload.entry_type.upper()}: ₹{amount} - {payload.note}".strip()
+    with transaction.atomic():
+        day, _ = DayBook.objects.select_for_update().get_or_create(
+            date=today, branch=branch,
+            defaults={'opening_balance': Decimal('0.00')}
+        )
+        if day.is_closed:
+            return 400, {"error": "Day book is already closed for today. Cannot post further cash entries."}
 
-    day.save()
+        if payload.entry_type == 'in':
+            day.cash_in += amount
+        else:
+            day.cash_out += amount
+
+        if payload.note:
+            day.notes = f"{day.notes}\n[{timezone.now().strftime('%H:%M')}] {payload.entry_type.upper()}: ₹{amount} - {payload.note}".strip()
+
+        day.save()
+
     return 201, _format_daybook(day)
+
+
+def _perform_close_day_book(request, day_id: int):
+    require_role(request.auth, ['owner', 'manager', 'accountant'])
+    notes = ''
+    try:
+        import json
+        if request.body:
+            body_data = json.loads(request.body)
+            notes = body_data.get('notes', '')
+    except Exception:
+        pass
+
+    with transaction.atomic():
+        day = DayBook.objects.select_for_update().filter(id=day_id).first()
+        if not day:
+            return 404, {"error": "DayBook not found."}
+        if day.is_closed:
+            return 400, {"error": "Day book is already closed for this date."}
+
+        day.closing_balance = day.opening_balance + day.cash_in - day.cash_out
+        day.is_closed = True
+        day.closed_by = request.auth
+        if notes:
+            day.notes = notes
+        day.save()
+
+    return 200, _format_daybook(day)
+
+
+@router.post("/day-book/{day_id}/close/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def close_day_book(request, day_id: int):
+    """
+    Close the business daybook cash drawer.
+    Computes closing_balance = opening_balance + cash_in - cash_out and locks entries.
+    """
+    return _perform_close_day_book(request, day_id)
+
+
+@router.post("/day-book/{day_id}/close_day/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def close_day_book_alias(request, day_id: int):
+    """Alias for close_day_book endpoint."""
+    return _perform_close_day_book(request, day_id)
+
+
+@router.post("/day-book/{day_id}/reopen/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def reopen_day_book(request, day_id: int):
+    """
+    Reopen the business daybook cash drawer for adjustments (Owner & Manager Level 60+).
+    """
+    require_role(request.auth, ['owner', 'manager'])
+    with transaction.atomic():
+        day = DayBook.objects.select_for_update().filter(id=day_id).first()
+        if not day:
+            return 404, {"error": "DayBook not found."}
+        day.is_closed = False
+        day.closed_by = None
+        reopen_note = f"\n[{timezone.now().strftime('%H:%M')}] DAY REOPENED by {request.auth.username}"
+        day.notes = (day.notes + reopen_note).strip()
+        day.save()
+    return 200, _format_daybook(day)
+
+
+@router.post("/day-book/{day_id}/reopen_day/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def reopen_day_book_alias(request, day_id: int):
+    """Alias for reopen_day_book endpoint."""
+    return reopen_day_book(request, day_id)
+
+
+@router.patch("/day-book/{day_id}/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def update_day_book_cash(request, day_id: int, payload: DayBookPatchIn):
+    """Patch update daybook cash values directly."""
+    require_role(request.auth, ['owner', 'manager', 'accountant'])
+    with transaction.atomic():
+        day = DayBook.objects.select_for_update().filter(id=day_id).first()
+        if not day:
+            return 404, {"error": "DayBook not found."}
+        if day.is_closed:
+            return 400, {"error": "Day book is already closed for this date. Cannot modify."}
+
+        if payload.cash_in is not None:
+            day.cash_in = payload.cash_in
+        if payload.cash_out is not None:
+            day.cash_out = payload.cash_out
+        if payload.notes is not None:
+            day.notes = payload.notes
+        day.save()
+    return 200, _format_daybook(day)
+
+
+@router.post("/day-book/{day_id}/reopen/", response={200: DayBookOut, 400: dict, 404: dict}, auth=jwt_auth)
+def reopen_day_book(request, day_id: int):
+    """Reopen a previously closed daybook for supervisor adjustments (Owner/Manager only)."""
+    require_role(request.auth, ['owner', 'manager'])
+    with transaction.atomic():
+        day = DayBook.objects.select_for_update().filter(id=day_id).first()
+        if not day:
+            return 404, {"error": "DayBook not found."}
+        if not day.is_closed:
+            return 400, {"error": "DayBook is already open."}
+        day.is_closed = False
+        day.save(update_fields=['is_closed'])
+    return 200, _format_daybook(day)

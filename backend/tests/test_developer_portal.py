@@ -140,3 +140,22 @@ class DeveloperPortalTestCase(TestCase):
         data = res.json()
         self.assertIn("access", data)
         self.assertEqual(data["schema_name"], self.demo_tenant.schema_name)
+
+    def test_developer_login_endpoint_success(self):
+        res = self.client.post(
+            '/api/developer/login/',
+            data=json.dumps({"username": "dev_superadmin", "password": "Super*Vault9"}),
+            content_type='application/json'
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("access", data)
+        self.assertEqual(data["user"]["role"], "superadmin")
+
+    def test_developer_login_endpoint_rejects_non_superadmin(self):
+        res = self.client.post(
+            '/api/developer/login/',
+            data=json.dumps({"username": "shop_owner_1", "password": "Owner*Vault9"}),
+            content_type='application/json'
+        )
+        self.assertIn(res.status_code, [401, 403])

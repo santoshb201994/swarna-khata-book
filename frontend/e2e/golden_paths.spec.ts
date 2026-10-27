@@ -50,4 +50,27 @@ test.describe('Golden Paths Feature Verification', () => {
     await expect(page).toHaveURL(/.*\/login/);
   });
 
+  test('Password eye toggle allows viewing and hiding entered password', async ({ page }) => {
+    await page.goto('/login');
+    const pwdInput = page.locator('input[placeholder="••••••••"]');
+    await pwdInput.fill('admin123');
+    await expect(pwdInput).toHaveAttribute('type', 'password');
+
+    // Click the eye toggle to show password
+    const toggleBtn = page.locator('button[aria-label="Show password"]');
+    await expect(toggleBtn).toBeVisible();
+    await toggleBtn.click();
+
+    // Now type should be text
+    await expect(pwdInput).toHaveAttribute('type', 'text');
+
+    // Click again to hide password
+    const hideBtn = page.locator('button[aria-label="Hide password"]');
+    await expect(hideBtn).toBeVisible();
+    await hideBtn.click();
+
+    // Type should return to password
+    await expect(pwdInput).toHaveAttribute('type', 'password');
+  });
+
 });

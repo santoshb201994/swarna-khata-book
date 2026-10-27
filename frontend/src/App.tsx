@@ -8,12 +8,24 @@ import { AccountingDashboard } from './features/accounting/AccountingDashboard';
 import { Login } from './features/auth/Login';
 import { MobileScannerPage } from './features/scanner/MobileScannerPage';
 import { DeveloperPortal } from './features/developer/DeveloperPortal';
+import { canAccessFeature, type WebappFeature } from './utils/rbac';
 import { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token, isLoading } = useAuth();
   if (isLoading) return <div className="p-8 text-center text-slate-400">Loading store...</div>;
   if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const FeatureRoute: React.FC<{
+  feature: WebappFeature;
+  children: React.ReactNode;
+}> = ({ feature, children }) => {
+  const { user } = useAuth();
+  if (!user || !canAccessFeature(user.role, feature)) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -36,7 +48,14 @@ export const App: React.FC = () => {
           >
             <Route index element={<POSScreen />} />
             <Route path="products" element={<ProductList />} />
-            <Route path="accounting" element={<AccountingDashboard />} />
+            <Route
+              path="accounting"
+              element={
+                <FeatureRoute feature="view_accounting">
+                  <AccountingDashboard />
+                </FeatureRoute>
+              }
+            />
           </Route>
         </Routes>
       </BrowserRouter>

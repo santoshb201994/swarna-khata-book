@@ -239,3 +239,71 @@ class MultiSourceGoldRateScraperTestCase(TestCase):
             )
             self.assertEqual(res.status_code, 400)
             self.assertIn("Unknown or unsupported rate source", res.json()['error'])
+
+    def test_auto_sync_after_multiple_manual_updates(self):
+        """Verify Auto-Sync succeeds even when multiple manual rates exist on the same date for a purity."""
+        from django.utils import timezone
+        with schema_context(self.tenant1.schema_name):
+            today = timezone.localdate()
+            purity_24k = Purity.objects.get(name="24KT (999)")
+
+            # Simulate 3 manual updates created earlier today
+            GoldRate.objects.create(
+                purity=purity_24k,
+                rate_per_gram=Decimal("7500.00"),
+                effective_date=today,
+                is_current=False,
+                branch=self.branch1,
+                entered_by=self.owner1
+            )
+            GoldRate.objects.create(
+                purity=purity_24k,
+                rate_per_gram=Decimal("7520.00"),
+                effective_date=today,
+                is_current=False,
+                branch=self.branch1,
+                entered_by=self.owner1
+            )
+            GoldRate.objects.create(
+                purity=purity_24k,
+                rate_per_gram=Decimal("7530.00"),
+                effective_date=today,
+                is_current=True,
+                branch=self.branch1,
+                entered_by=self.owner1
+            )
+
+            # Confirm 3 records exist for today
+            self.assertEqual(
+                GoldRate.objects.filter(purity=purity_24k, branch=self.branch1, effective_date=today).count(),
+                3
+            )
+
+            # Trigger auto-sync from KSJF
+            from unittest.mock import patch
+            from apps.accounting.scrapers.base import RateScrapeResult
+            mock_scrape = RateScrapeResult(
+                source_id="ksjf",
+                source_name="Karnataka State Jewellers Federation",
+                source_url="https://ksjf.in/market.php",
+                rates_per_gram={"24KT (999)": Decimal("14140.00"), "22KT (916)": Decimal("13070.00")},
+                raw_data={},
+                effective_date=today
+            )
+            with patch('apps.accounting.scrapers.ksjf_scraper.KSJFScraper.fetch_and_parse', return_value=mock_scrape):
+                res = self.client.post(
+                    '/api/gold-rates/sync/',
+                    data=json.dumps({"source": "ksjf"}),
+                    content_type='application/json',
+                    HTTP_AUTHORIZATION=f'Bearer {self.owner1_token}',
+                    HTTP_X_TENANT='demo'
+                )
+
+            self.assertEqual(res.status_code, 200, res.content)
+            data = res.json()
+            self.assertEqual(data["status"], "success")
+
+            # Check that only ONE rate is current for this purity & branch
+            current_rates = GoldRate.objects.filter(purity=purity_24k, branch=self.branch1, is_current=True)
+            self.assertEqual(current_rates.count(), 1)
+            self.assertEqual(current_rates.first().rate_per_gram, Decimal("14140.00"))

@@ -18,6 +18,8 @@ import api from '../../api/client';
 import type { Product, Category, Purity } from '../../types';
 import { ProductFormModal } from './ProductFormModal';
 import { QRTagModal } from './QRTagModal';
+import { useAuth } from '../../context/AuthContext';
+import { canAccessFeature } from '../../utils/rbac';
 import toast from 'react-hot-toast';
 
 type SortField =
@@ -33,6 +35,9 @@ type SortField =
   | 'created_at';
 
 export const ProductList: React.FC = () => {
+  const { user } = useAuth();
+  const canAddProduct = canAccessFeature(user?.role, 'add_edit_products');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [purities, setPurities] = useState<Purity[]>([]);
@@ -322,14 +327,16 @@ export const ProductList: React.FC = () => {
             <span>Export Excel</span>
           </button>
 
-          {/* Add Product Button */}
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Jewelry Item</span>
-          </button>
+          {/* Add Product Button (Hierarchy Level 60+: Manager, Owner, Superadmin) */}
+          {canAddProduct && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Jewelry Item</span>
+            </button>
+          )}
         </div>
       </div>
 

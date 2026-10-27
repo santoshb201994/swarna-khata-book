@@ -3,21 +3,24 @@ import {
   Search,
   Camera,
   Trash2,
-  Printer,
+  Download,
   Plus,
   CheckCircle2,
   Receipt,
-  UserCheck,
   CreditCard,
   QrCode,
   X,
   Smartphone
 } from 'lucide-react';
 import api from '../../api/client';
-import type { Product, Customer, GoldRate } from '../../types';
+import type { Product, Customer, GoldRate, Sale } from '../../types';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PosScannerConnectionModal } from './PosScannerConnectionModal';
+import { InvoiceModal } from './InvoiceModal';
+import { CustomerSelectOrAdd } from '../customers/CustomerSelectOrAdd';
+import { downloadInvoicePdf } from '../../utils/invoiceDownload';
+import { resolveProductRate } from './metalRateHelper';
 
 interface CartItem {
   product: Product;
@@ -33,6 +36,7 @@ export const POSScreen: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [goldRates, setGoldRates] = useState<Record<string, number>>({});
+  const [rawRates, setRawRates] = useState<GoldRate[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -51,6 +55,8 @@ export const POSScreen: React.FC = () => {
 
   // Completed sale info for invoice print
   const [completedSaleId, setCompletedSaleId] = useState<number | null>(null);
+  const [activeInvoiceSale, setActiveInvoiceSale] = useState<Sale | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Mobile QR Scanner Pairing & Real-time Sync State
@@ -72,6 +78,7 @@ export const POSScreen: React.FC = () => {
   // Stable refs so the WebSocket closure always reads the latest values
   // without needing to reconnect every time goldRates or addToCart changes.
   const goldRatesRef = useRef<Record<string, number>>({});
+  const rawRatesRef = useRef<GoldRate[]>([]);
   const addToCartRef = useRef<((p: Product) => void) | null>(null);
 
   const updateActiveSessionId = useCallback((sessionId: string | null) => {
@@ -256,10 +263,15 @@ export const POSScreen: React.FC = () => {
       const ratesList: GoldRate[] = ratesRes.data.results || ratesRes.data;
       ratesList.forEach((r) => {
         rateMap[r.purity_name] = parseFloat(r.rate_per_gram);
+        rateMap[r.purity_name.toLowerCase()] = parseFloat(r.rate_per_gram);
+        if (r.purity_id) rateMap[String(r.purity_id)] = parseFloat(r.rate_per_gram);
+        if (r.purity) rateMap[String(r.purity)] = parseFloat(r.rate_per_gram);
       });
-      // Update both state (for UI display) and the stable ref (for WS closure)
+      // Update both state (for UI display) and stable refs (for WS closure)
       goldRatesRef.current = rateMap;
+      rawRatesRef.current = ratesList;
       setGoldRates(rateMap);
+      setRawRates(ratesList);
     } catch {
       toast.error('Failed to load POS data');
     }
@@ -305,42 +317,52 @@ export const POSScreen: React.FC = () => {
       const parsed = JSON.parse(qrData);
       const match = products.find((p) => p.sku === parsed.sku || p.id === parsed.id);
       if (match) {
+        if (match.item_status === 'SOLD' || !match.is_active) {
+          toast.error(`'${match.name}' is already sold and removed from inventory.`);
+          return;
+        }
         addToCart(match);
         toast.success(`Scanned: ${match.name}`);
       } else {
-        toast.error(`Product with SKU ${parsed.sku} not found`);
+        toast.error(`Product with SKU ${parsed.sku} not in inventory or already sold`);
       }
     } catch {
       // If it's a plain string SKU
       const match = products.find((p) => p.sku.toLowerCase() === qrData.toLowerCase());
       if (match) {
+        if (match.item_status === 'SOLD' || !match.is_active) {
+          toast.error(`'${match.name}' is already sold and removed from inventory.`);
+          return;
+        }
         addToCart(match);
         toast.success(`Scanned: ${match.name}`);
       } else {
-        toast.error('Invalid QR code scanned');
+        toast.error(`Item '${qrData}' not in inventory or already sold`);
       }
     }
   };
 
-  // addToCart reads from goldRatesRef so it always uses the latest rates,
+  // addToCart reads from stable refs so it always uses the latest rates,
   // even when called from the WebSocket closure that was created earlier.
   const addToCart = useCallback((product: Product) => {
-    const purityName = product.purity_name || '22KT (916)';
-    // Read from the stable ref — always has the freshest rates regardless of closure age
-    const currentRate = goldRatesRef.current[purityName] || goldRates[purityName] || 6830;
+    if (product.item_status === 'SOLD' || !product.is_active) {
+      toast.error(`'${product.name}' is already sold and removed from inventory.`);
+      return;
+    }
+    const { rate: currentRate } = resolveProductRate(product, rawRatesRef.current, goldRatesRef.current);
     const netWt = parseFloat(product.net_weight) || 0;
-    const goldVal = netWt * currentRate;
+    const metalVal = netWt * currentRate;
 
     let making = 0;
     if (product.making_charge_type === 'per_gram') {
       making = (parseFloat(product.making_charge_value) || 0) * netWt;
     } else if (product.making_charge_type === 'percent') {
-      making = goldVal * ((parseFloat(product.making_charge_value) || 0) / 100);
+      making = metalVal * ((parseFloat(product.making_charge_value) || 0) / 100);
     } else {
       making = parseFloat(product.making_charge_value) || 0;
     }
 
-    const unitPrice = Math.round((goldVal + making) * 100) / 100;
+    const unitPrice = Math.round((metalVal + making) * 100) / 100;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
@@ -368,7 +390,36 @@ export const POSScreen: React.FC = () => {
         },
       ];
     });
-  }, [goldRates]); // goldRates in dep array so useCallback recreates when rates load
+  }, []);
+
+  const updateCartItemRate = (productId: number, newRate: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product.id === productId) {
+          const rate = Math.max(0, newRate);
+          const netWt = parseFloat(item.product.net_weight) || 0;
+          const metalVal = netWt * rate;
+          let making = 0;
+          if (item.product.making_charge_type === 'per_gram') {
+            making = (parseFloat(item.product.making_charge_value) || 0) * netWt;
+          } else if (item.product.making_charge_type === 'percent') {
+            making = metalVal * ((parseFloat(item.product.making_charge_value) || 0) / 100);
+          } else {
+            making = item.making_charge;
+          }
+          const unitPrice = Math.round((metalVal + making + item.stone_charge) * 100) / 100;
+          return {
+            ...item,
+            gold_rate_per_gram: rate,
+            making_charge: Math.round(making * 100) / 100,
+            unit_price: unitPrice,
+            total_price: Math.round(unitPrice * item.quantity * 100) / 100,
+          };
+        }
+        return item;
+      })
+    );
+  };
 
   // Keep addToCartRef in sync so the WebSocket onmessage always calls the latest version
   useEffect(() => {
@@ -443,7 +494,13 @@ export const POSScreen: React.FC = () => {
       const res = await api.post('/sales/', payload);
       const createdSale = res.data;
       setCompletedSaleId(createdSale.id);
+      setActiveInvoiceSale(createdSale);
+      setIsInvoiceModalOpen(true);
       toast.success(`Invoice #${createdSale.invoice_number} created successfully!`);
+
+      // Automatically remove sold item(s) from shop inventory state
+      const soldProductIds = new Set(payload.items.map((it: any) => it.product_id));
+      setProducts((prev) => prev.filter((p) => !soldProductIds.has(p.id)));
 
       // Clear cart
       setCart([]);
@@ -451,6 +508,9 @@ export const POSScreen: React.FC = () => {
       setDiscount('0');
       setOldGoldWeight('0');
       setNotes('');
+
+      // Refresh catalog from server
+      fetchInitialData();
     } catch (err: any) {
       toast.error('Checkout failed. Check stock availability.');
     } finally {
@@ -458,11 +518,25 @@ export const POSScreen: React.FC = () => {
     }
   };
 
-  const handleDownloadInvoice = (saleId: number) => {
-    window.open(`/api/sales/${saleId}/invoice_pdf/`, '_blank');
+  const handleCustomerAddedOrUpdated = (cust: Customer) => {
+    setCustomers((prev) => {
+      const idx = prev.findIndex((c) => c.id === cust.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = cust;
+        return copy;
+      }
+      return [cust, ...prev];
+    });
+  };
+
+  const handleDownloadInvoice = async (saleId: number) => {
+    await downloadInvoicePdf(saleId, activeInvoiceSale?.invoice_number);
   };
 
   const filteredCatalog = products.filter((p) => {
+    // Strictly exclude sold or inactive items from appearing in the POS catalog
+    if (p.item_status === 'SOLD' || !p.is_active) return false;
     const term = searchQuery.trim().toLowerCase();
     if (!term) return true;
     return (
@@ -533,14 +607,35 @@ export const POSScreen: React.FC = () => {
             {/* Quick Live Rates Indicator */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
               <span className="text-slate-400 font-semibold uppercase text-[10px]">Today's Rates:</span>
-              {Object.entries(goldRates).map(([purity, rate]) => (
-                <span
-                  key={purity}
-                  className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-md font-mono text-[11px]"
-                >
-                  <b>{purity}</b>: ₹{rate}/g
-                </span>
-              ))}
+              {rawRates.length > 0 ? (
+                rawRates.map((r) => {
+                  const isSilver = /silver|925|chandi/i.test(r.purity_name);
+                  const isPlat = /platinum|950/i.test(r.purity_name);
+                  return (
+                    <span
+                      key={r.id || r.purity_name}
+                      className={`px-2 py-0.5 border rounded-md font-mono text-[11px] ${
+                        isSilver
+                          ? 'bg-slate-100 border-slate-300 text-slate-800'
+                          : isPlat
+                          ? 'bg-sky-50 border-sky-300 text-sky-800'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}
+                    >
+                      <b>{r.purity_name}</b>: ₹{parseFloat(String(r.rate_per_gram)).toLocaleString('en-IN')}/g
+                    </span>
+                  );
+                })
+              ) : (
+                Object.entries(goldRates).map(([purity, rate]) => (
+                  <span
+                    key={purity}
+                    className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-md font-mono text-[11px]"
+                  >
+                    <b>{purity}</b>: ₹{rate}/g
+                  </span>
+                ))
+              )}
             </div>
           </div>
 
@@ -548,8 +643,11 @@ export const POSScreen: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden max-h-[520px] overflow-y-auto">
             <div className="divide-y divide-slate-100">
               {filteredCatalog.map((prod) => {
-                const purityName = prod.purity_name || '22KT (916)';
-                const currentRate = goldRates[purityName] || 6830;
+                const { rate: currentRate, metalType, purityLabel } = resolveProductRate(
+                  prod,
+                  rawRates,
+                  goldRates
+                );
                 const estValue = Math.round(parseFloat(prod.net_weight) * currentRate);
 
                 return (
@@ -570,15 +668,30 @@ export const POSScreen: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <h4 className="font-bold text-sm text-slate-800">{prod.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-slate-800">{prod.name}</h4>
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              metalType === 'silver'
+                                ? 'bg-slate-200 text-slate-800'
+                                : metalType === 'platinum'
+                                ? 'bg-sky-100 text-sky-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {metalType}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mt-0.5">
                           <span className="bg-slate-100 px-1.5 py-0.2 rounded font-semibold text-slate-700">
                             {prod.sku}
                           </span>
                           <span>•</span>
-                          <span className="text-amber-800 font-medium">{purityName}</span>
+                          <span className="text-amber-800 font-medium">{purityLabel}</span>
                           <span>•</span>
                           <span>Net: {Number(prod.net_weight).toFixed(3)}g</span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-semibold font-mono">₹{currentRate}/g</span>
                         </div>
                       </div>
                     </div>
@@ -592,7 +705,7 @@ export const POSScreen: React.FC = () => {
                       </div>
                       <button
                         onClick={() => addToCart(prod)}
-                        className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition"
+                        className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition cursor-pointer"
                         title="Add to Bill"
                       >
                         <Plus className="w-4 h-4" />
@@ -618,25 +731,13 @@ export const POSScreen: React.FC = () => {
               </span>
             </div>
 
-            {/* Customer Selector */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                <span>Select Customer</span>
-              </label>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden"
-              >
-                <option value="">Walk-in Customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Customer Selector & Quick Add */}
+            <CustomerSelectOrAdd
+              customers={customers}
+              selectedCustomerId={selectedCustomerId}
+              onSelectCustomer={(id) => setSelectedCustomerId(id)}
+              onCustomerAddedOrUpdated={handleCustomerAddedOrUpdated}
+            />
 
             {/* Cart Items List */}
             <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
@@ -645,49 +746,83 @@ export const POSScreen: React.FC = () => {
                   No items in invoice. Select items from left or scan QR.
                 </div>
               ) : (
-                cart.map((item) => (
-                  <div key={item.product.id} className="py-2.5 flex items-center justify-between text-xs">
-                    <div className="flex-1 pr-2">
-                      <div className="font-semibold text-slate-800 line-clamp-1">
-                        {item.product.name}
+                cart.map((item) => {
+                  const { metalType, purityLabel } = resolveProductRate(item.product, rawRates, goldRates);
+                  return (
+                    <div key={item.product.id} className="py-2.5 flex items-center justify-between text-xs">
+                      <div className="flex-1 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800 line-clamp-1">
+                            {item.product.name}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                              metalType === 'silver'
+                                ? 'bg-slate-200 text-slate-800'
+                                : metalType === 'platinum'
+                                ? 'bg-sky-100 text-sky-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {metalType}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-slate-500 font-mono text-[10px] mt-1">
+                          <span className="text-slate-600 font-semibold">{item.product.sku}</span>
+                          <span>•</span>
+                          <span>{purityLabel}</span>
+                          <span>•</span>
+                          <span>{Number(item.product.net_weight).toFixed(3)}g @</span>
+                          <div className="inline-flex items-center bg-white border border-slate-300 rounded px-1 py-0.5 shadow-2xs">
+                            <span className="text-slate-500">₹</span>
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              value={item.gold_rate_per_gram}
+                              onChange={(e) => updateCartItemRate(item.product.id, parseFloat(e.target.value) || 0)}
+                              className="w-14 bg-transparent text-slate-900 font-bold font-mono text-[11px] focus:outline-hidden text-right"
+                              title="Edit rate per gram for this item"
+                            />
+                            <span className="text-slate-500">/g</span>
+                          </div>
+                          <span>+ ₹{item.making_charge} mk</span>
+                        </div>
                       </div>
-                      <div className="text-slate-400 font-mono text-[10px]">
-                        {item.product.sku} | ₹{item.gold_rate_per_gram}/g + ₹{item.making_charge} mk
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center border border-slate-200 rounded-lg">
+                          <button
+                            onClick={() => updateQuantity(item.product.id, -1)}
+                            className="px-2 py-0.5 text-slate-500 hover:bg-slate-100 font-mono cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="px-2 py-0.5 font-bold font-mono text-slate-800">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, 1)}
+                            className="px-2 py-0.5 text-slate-500 hover:bg-slate-100 font-mono cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="font-mono font-bold text-slate-900 w-20 text-right">
+                          ₹{item.total_price.toLocaleString('en-IN')}
+                        </div>
+
+                        <button
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded-md cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center border border-slate-200 rounded-lg">
-                        <button
-                          onClick={() => updateQuantity(item.product.id, -1)}
-                          className="px-2 py-0.5 text-slate-500 hover:bg-slate-100 font-mono"
-                        >
-                          -
-                        </button>
-                        <span className="px-2 py-0.5 font-bold font-mono text-slate-800">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(item.product.id, 1)}
-                          className="px-2 py-0.5 text-slate-500 hover:bg-slate-100 font-mono"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <div className="font-mono font-bold text-slate-900 w-20 text-right">
-                        ₹{item.total_price.toLocaleString('en-IN')}
-                      </div>
-
-                      <button
-                        onClick={() => removeFromCart(item.product.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 rounded-md"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -739,7 +874,7 @@ export const POSScreen: React.FC = () => {
             {/* Invoice Bill Calculation Breakdown */}
             <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs font-mono">
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal (Pure Gold + Making):</span>
+                <span>Subtotal (Metal + Making):</span>
                 <span>₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-slate-600">
@@ -799,20 +934,40 @@ export const POSScreen: React.FC = () => {
               <span>{isSubmitting ? 'Processing Transaction...' : 'Complete Sale & Save'}</span>
             </button>
 
-            {/* Quick Invoice Download for Last Sale */}
+            {/* Quick Invoice Action for Last Sale */}
             {completedSaleId && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Invoice ready!</span>
+                  <span>Invoice #{activeInvoiceSale?.invoice_number || completedSaleId} ready!</span>
                 </div>
-                <button
-                  onClick={() => handleDownloadInvoice(completedSaleId)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Tax Invoice PDF</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={async () => {
+                      if (!activeInvoiceSale) {
+                        try {
+                          const res = await api.get(`/sales/${completedSaleId}/`);
+                          setActiveInvoiceSale(res.data);
+                        } catch {
+                          // ignore
+                        }
+                      }
+                      setIsInvoiceModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 transition shadow-sm"
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>View & Print Bill</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadInvoice(completedSaleId)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold rounded-lg transition"
+                    title="Direct PDF Download"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>PDF</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -854,6 +1009,13 @@ export const POSScreen: React.FC = () => {
           setIsMobileConnected(false);
           setMobileDeviceInfo(null);
         }}
+      />
+
+      {/* High-Precision Interactive Bill & Print Modal */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        sale={activeInvoiceSale}
       />
     </div>
   );

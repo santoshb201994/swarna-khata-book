@@ -14,7 +14,7 @@ from apps.accounting.models import ShopRateSetting
 from ninja_api.auth import create_token, jwt_auth, require_role
 from ninja_api.schemas import (
     StoreRegistrationIn, StoreRegistrationOut, TenantOut, TenantCreateIn,
-    PasswordResetIn, StaffStatusUpdateIn, SwitchStoreIn
+    PasswordResetIn, StaffStatusUpdateIn, SwitchStoreIn, TokenRequest, TokenResponse
 )
 
 router = Router(tags=["Tenant Store Onboarding & SaaS Management"])
@@ -153,21 +153,23 @@ def _format_tenant(t: Client) -> dict:
     }
 
 
-@router.get("/tenants/", response=List[TenantOut], auth=None)
+@router.get("/tenants/", response={200: List[TenantOut], 403: dict}, auth=jwt_auth)
 def list_tenants(request):
     """
-    List all provisioned tenants in the jewellery ERP multi-tenant cluster.
+    List all provisioned tenants in the jewellery ERP multi-tenant cluster (Superadmin only).
     """
+    require_role(request.auth, ['superadmin'])
     clients = Client.objects.prefetch_related('domains').all()
-    return [_format_tenant(c) for c in clients]
+    return 200, [_format_tenant(c) for c in clients]
 
 
-@router.post("/tenants/", response={201: TenantOut, 400: dict}, auth=None)
+@router.post("/tenants/", response={201: TenantOut, 400: dict, 403: dict}, auth=jwt_auth)
 def create_tenant(request, payload: TenantCreateIn):
     """
-    Provision a brand new jewellery shop tenant.
+    Provision a brand new jewellery shop tenant (Superadmin only).
     Triggers automatic PostgreSQL schema creation and runs tenant database migrations.
     """
+    require_role(request.auth, ['superadmin'])
     schema = payload.schema_name.lower().strip()
     if not schema.isidentifier():
         return 400, {"error": "schema_name must be a valid alphanumeric identifier (e.g. 'swarna_pune')."}
@@ -199,6 +201,36 @@ def create_tenant(request, payload: TenantCreateIn):
 # ==============================================================================
 # DEVELOPER / SUPER ADMIN MANAGEMENT ENDPOINTS
 # ==============================================================================
+
+@router.post("/developer/login/", response={200: TokenResponse, 401: dict, 403: dict}, auth=None)
+def developer_login(request, payload: TokenRequest):
+    """
+    Dedicated endpoint for Developer / Superadmin authentication.
+    Always authenticates directly against the public schema with superadmin validation.
+    """
+    from django.contrib.auth import authenticate
+    with schema_context('public'):
+        user = authenticate(request, username=payload.username, password=payload.password)
+        if not user or not user.is_active:
+            return 401, {"error": "Invalid developer credentials."}
+        if not (user.is_superuser or user.role == 'superadmin'):
+            return 403, {"error": "Access denied: Account is not a platform superadmin."}
+
+        user.role = 'superadmin'
+        access_token = create_token(user, token_type='access')
+        refresh_token = create_token(user, token_type='refresh')
+        return 200, {
+            "access": access_token,
+            "refresh": refresh_token,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": "superadmin",
+                "branch_id": user.branch_id,
+            }
+        }
+
 
 @router.get("/developer/overview/", response={200: dict, 403: dict}, auth=jwt_auth)
 def developer_overview(request):
@@ -267,17 +299,21 @@ def toggle_tenant_status(request, schema_name: str, payload: StaffStatusUpdateIn
     if schema_name == 'public':
         return 400, {"error": "Cannot toggle public schema."}
 
-    tenant = Client.objects.filter(schema_name=schema_name).first()
-    if not tenant:
-        return 400, {"error": f"Tenant '{schema_name}' not found."}
+    with schema_context('public'):
+        tenant = Client.objects.filter(schema_name=schema_name).first()
+        if not tenant:
+            return 400, {"error": f"Tenant '{schema_name}' not found."}
 
-    tenant.is_active = payload.is_active
-    tenant.save(update_fields=['is_active'])
+        tenant.is_active = payload.is_active
+        tenant.save(update_fields=['is_active'])
+        tenant_name = tenant.name
+        is_active = tenant.is_active
+
     return 200, {
         "success": True,
         "schema_name": schema_name,
-        "is_active": tenant.is_active,
-        "message": f"Tenant '{tenant.name}' is now {'active' if tenant.is_active else 'suspended'}."
+        "is_active": is_active,
+        "message": f"Tenant '{tenant_name}' is now {'active' if is_active else 'suspended'}."
     }
 
 

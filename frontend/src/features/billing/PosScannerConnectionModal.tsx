@@ -44,8 +44,8 @@ export const PosScannerConnectionModal: React.FC<PosScannerConnectionModalProps>
     try {
       setIsLoading(true);
       const effectiveHost = hostOverride || customHost || window.location.host;
-      // Mobile camera permissions strictly require HTTPS
-      const protocol = 'https:';
+      // When accessed via Cloudflare Tunnel, protocol is https:; locally matches active window
+      const protocol = window.location.protocol;
       const baseUrl = `${protocol}//${effectiveHost}`;
 
       const res = await api.post('/pos/pairing/start/', {

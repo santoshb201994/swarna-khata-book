@@ -21,16 +21,27 @@ def parse_query_string(query_string_bytes: bytes) -> dict[str, str]:
 
 
 @sync_to_async
-def get_active_session(session_id: str):
-    # Try current active schema
+def get_active_session(session_id: str, tenant_schema: str = None):
+    from django_tenants.utils import schema_context, get_tenant_model
+    # 1. Targeted direct schema lookup (O(1))
+    if tenant_schema and tenant_schema != 'public':
+        try:
+            with schema_context(tenant_schema):
+                session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
+                if session:
+                    return session
+        except Exception:
+            pass
+
+    # 2. Try current active connection schema
     session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
     if session:
         return session
-    # Fallback: search across all tenant and public schemas
+
+    # 3. Graceful fallback search if tenant_schema was omitted
     try:
-        from django_tenants.utils import schema_context, get_tenant_model
         tenant_model = get_tenant_model()
-        for tenant in tenant_model.objects.all():
+        for tenant in tenant_model.objects.exclude(schema_name='public'):
             with schema_context(tenant.schema_name):
                 session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
                 if session:
@@ -74,12 +85,22 @@ async def pos_websocket_app(scope, receive, send):
     params = parse_query_string(scope.get('query_string', b''))
     session_id = params.get('session_id')
     token = params.get('token')
+    tenant_schema = params.get('tenant')
 
     if not session_id or not token:
         await send({"type": "websocket.close", "code": 4401})
         return
 
-    session = await get_active_session(session_id)
+    if not tenant_schema and token:
+        try:
+            import jwt
+            secret = getattr(settings, 'JWT_SECRET_KEY', settings.SECRET_KEY)
+            tok_claims = jwt.decode(token, secret, algorithms=['HS256'], options={"verify_exp": False})
+            tenant_schema = tok_claims.get('tenant_schema')
+        except Exception:
+            pass
+
+    session = await get_active_session(session_id, tenant_schema=tenant_schema)
     if not session:
         await send({"type": "websocket.close", "code": 4404})
         return
@@ -146,7 +167,8 @@ async def mobile_websocket_app(scope, receive, send):
         await send({"type": "websocket.close", "code": 4403})
         return
 
-    session = await get_active_session(session_id)
+    tenant_schema = params.get('tenant') or payload.get('tenant_schema')
+    session = await get_active_session(session_id, tenant_schema=tenant_schema)
     if not session:
         await send({"type": "websocket.close", "code": 4404})
         return

@@ -1,3 +1,4 @@
+from django.conf import settings
 from ninja import NinjaAPI
 from ninja.errors import ValidationError, HttpError
 from django.core.exceptions import ObjectDoesNotExist
@@ -12,6 +13,7 @@ from ninja_api.routers.qr_tags_router import router as qr_tags_router
 from ninja_api.routers.pos_pairing_router import router as pos_pairing_router
 from ninja_api.routers.tenants_router import router as tenants_router
 from ninja_api.routers.bills_router import router as bills_router
+from ninja_api.routers.export_router import router as export_router
 
 api = NinjaAPI(
     title="Swarna Khata Jewellery ERP API",
@@ -20,8 +22,8 @@ api = NinjaAPI(
         "Production-grade Multi-Tenant Jewellery ERP, Billing & Khata Book API. "
         "Engineered with Django Ninja (Pydantic type-safety) and django-tenants (PostgreSQL schema isolation)."
     ),
-    docs_url="/docs",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 
@@ -63,3 +65,4 @@ api.add_router("/", qr_tags_router)
 api.add_router("/", pos_pairing_router)
 api.add_router("/", tenants_router)
 api.add_router("/", bills_router)
+api.add_router("/", export_router)

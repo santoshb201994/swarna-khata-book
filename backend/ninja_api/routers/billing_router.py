@@ -7,15 +7,17 @@ from django.utils import timezone
 from ninja import Router
 from ninja.errors import HttpError
 
-from apps.billing.models import Sale, SaleItem, Payment
+from apps.billing.models import Sale, SaleItem, Payment, InvoiceSetting, Item
 from apps.billing.services import generate_invoice_pdf, _next_invoice_number
 from apps.products.models import Product
+from apps.accounts.models import Branch
 from apps.accounting.models import Customer, DayBook
 from apps.stock.models import StockMovement, StockSummary
 from apps.stock.services import record_stock_movement
 from ninja_api.auth import jwt_auth, require_role
 from ninja_api.schemas import (
-    SaleCreateIn, SaleOut, SaleListOut, SaleItemOut, PaymentOut, AddPaymentIn
+    SaleCreateIn, SaleOut, SaleListOut, SaleItemOut, PaymentOut, AddPaymentIn,
+    InvoiceSettingOut, InvoiceSettingUpdateIn
 )
 
 router = Router(tags=["POS Billing & Invoicing Engine"])
@@ -30,6 +32,7 @@ def _format_sale(sale: Sale) -> dict:
             "product_name": it.product_name,
             "sku": it.sku,
             "purity": it.purity,
+            "quantity": it.quantity,
             "gross_weight": it.gross_weight,
             "net_weight": it.net_weight,
             "gold_rate_per_gram": it.gold_rate_per_gram,
@@ -39,6 +42,8 @@ def _format_sale(sale: Sale) -> dict:
             "total_price": it.total_price,
             "hsn_code": it.hsn_code,
             "gst_rate": it.gst_rate,
+            "huid": it.huid or (it.product.huid if it.product and it.product.huid else ""),
+            "wastage_percent": it.wastage_percent,
         })
 
     payments = []
@@ -52,11 +57,28 @@ def _format_sale(sale: Sale) -> dict:
             "note": p.note,
         })
 
+    # Retrieve or initialize branch invoice settings
+    branch = sale.branch or Branch.objects.first()
+    invoice_setting = None
+    if branch:
+        inv_obj, _ = InvoiceSetting.objects.get_or_create(branch=branch)
+        invoice_setting = inv_obj
+
+    # Prioritize immutable snapshots with fallback to live relations
+    cust_snap = getattr(sale, 'customer_snapshot', None) or {}
+    customer_name = cust_snap.get('name') or (sale.customer.name if sale.customer else None)
+    customer_phone = cust_snap.get('phone') or (sale.customer.phone if sale.customer else None)
+    customer_address = cust_snap.get('address') or (sale.customer.address if sale.customer else None)
+    customer_pan = cust_snap.get('pan_number') or (sale.customer.pan_number if sale.customer else None)
+
     return {
         "id": sale.id,
         "invoice_number": sale.invoice_number,
         "customer_id": sale.customer_id,
-        "customer_name": sale.customer.name if sale.customer else None,
+        "customer_name": customer_name,
+        "customer_phone": customer_phone,
+        "customer_address": customer_address,
+        "customer_pan": customer_pan,
         "branch_id": sale.branch_id,
         "sale_date": sale.sale_date,
         "gold_rate_per_gram": sale.gold_rate_per_gram,
@@ -74,6 +96,10 @@ def _format_sale(sale: Sale) -> dict:
         "notes": sale.notes,
         "items": items,
         "payments": payments,
+        "invoice_setting": invoice_setting,
+        "shop_snapshot": sale.shop_snapshot or {},
+        "customer_snapshot": sale.customer_snapshot or {},
+        "pdf_sha256": sale.pdf_sha256 or "",
     }
 
 
@@ -174,6 +200,20 @@ def create_sale_invoice(request, payload: SaleCreateIn):
         if payload.customer_id:
             customer = Customer.objects.filter(id=payload.customer_id).first()
 
+        # Check today's DayBook if cash is part of payment
+        today = timezone.localdate()
+        payment_list = []
+        if payload.payments:
+            payment_list.extend(payload.payments)
+        elif payload.payment:
+            payment_list.append(payload.payment)
+
+        has_cash = any(p.method.lower() == 'cash' for p in payment_list)
+        if has_cash:
+            day_book_check = DayBook.objects.filter(date=today, branch=branch).first()
+            if day_book_check and day_book_check.is_closed:
+                return 400, {"error": "DayBook cash drawer is closed for today. Reopen DayBook to process cash payments."}
+
         # 3. Create Draft Sale
         invoice_num = _next_invoice_number(branch)
         sale = Sale.objects.create(
@@ -219,6 +259,8 @@ def create_sale_invoice(request, payload: SaleCreateIn):
                 total_price=item_total,
                 hsn_code=prod.hsn_code or '7113',
                 gst_rate=gst_rate,
+                huid=prod.huid or '',
+                wastage_percent=Decimal('0.00'),
             )
 
             # Record stock movement OUT
@@ -232,6 +274,21 @@ def create_sale_invoice(request, payload: SaleCreateIn):
                 branch=branch,
                 note=f"POS Sale Invoice {sale.invoice_number}"
             )
+
+            # Automatically remove sold item from active shop inventory
+            summary = StockSummary.objects.filter(product=prod).first()
+            if not summary or summary.quantity_on_hand <= 0:
+                prod.is_active = False
+                prod.save(update_fields=['is_active', 'updated_at'])
+                Item.objects.update_or_create(
+                    qr_code=prod.sku,
+                    defaults={
+                        'name': prod.name,
+                        'weight': prod.gross_weight,
+                        'status': Item.Status.SOLD,
+                        'locked_by_bill': None,
+                    }
+                )
 
             subtotal += item_total
             total_gst += gst_on_item
@@ -247,7 +304,13 @@ def create_sale_invoice(request, payload: SaleCreateIn):
         cgst = (total_gst / 2).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         sgst = total_gst - cgst  # Guarantees mathematical exactness without float drift
         discount = payload.discount.quantize(Decimal('0.01'))
-        total = (subtotal + total_gst - discount).quantize(Decimal('0.01'))
+
+        # Financial Invariant: Discount cannot exceed gross invoice total (subtotal + tax)
+        gross_total = (subtotal + total_gst).quantize(Decimal('0.01'))
+        if discount > gross_total:
+            return 400, {"error": f"Discount (₹{discount}) cannot exceed gross invoice amount (₹{gross_total})."}
+
+        total = (gross_total - discount).quantize(Decimal('0.01'))
 
         # 7. Collect All Payments (Single or Split)
         payment_list = []
@@ -305,10 +368,12 @@ def create_sale_invoice(request, payload: SaleCreateIn):
         # 9. DayBook Cash Ledger Integration: Record cash received in today's ledger
         if total_cash_received > Decimal('0.00'):
             today = timezone.localdate()
-            day_book, _ = DayBook.objects.get_or_create(
+            day_book, _ = DayBook.objects.select_for_update().get_or_create(
                 date=today, branch=branch,
                 defaults={'opening_balance': Decimal('0.00')}
             )
+            if day_book.is_closed:
+                return 400, {"error": "Cannot post cash intake to a closed DayBook. Reopen DayBook first."}
             day_book.cash_in += total_cash_received
             day_book.save(update_fields=['cash_in', 'updated_at'])
 
@@ -331,7 +396,117 @@ def download_invoice_pdf(request, sale_id: int):
     pdf_bytes = generate_invoice_pdf(sale)
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="invoice_{sale.invoice_number}.pdf"'
+    response['Access-Control-Expose-Headers'] = 'Content-Disposition'
     return response
+
+
+@router.get("/sales/{sale_id}/invoice_pdf/", auth=jwt_auth)
+def download_invoice_pdf_underscore(request, sale_id: int):
+    """Compatibility alias for invoice PDF download."""
+    return download_invoice_pdf(request, sale_id)
+
+
+# ==============================================================================
+# INVOICE CUSTOMIZATION & SETTINGS ENGINE
+# ==============================================================================
+
+@router.get("/billing/invoice-settings/", response=InvoiceSettingOut, auth=jwt_auth)
+def get_invoice_settings(request):
+    """Retrieve invoice branding, layout templates, toggles, and terms for the active branch."""
+    user = request.auth
+    branch = getattr(user, 'branch', None)
+    if not branch:
+        branch = Branch.objects.first()
+    if not branch:
+        branch = Branch.objects.create(name="Main Showroom", is_active=True)
+    setting, _ = InvoiceSetting.objects.get_or_create(branch=branch)
+    return setting
+
+
+@router.put("/billing/invoice-settings/", response=InvoiceSettingOut, auth=jwt_auth)
+def update_invoice_settings(request, payload: InvoiceSettingUpdateIn):
+    """
+    Update invoice template style, headers, invocations, columns, and terms.
+    Strictly restricted to Store Owners and Managers.
+    """
+    user = request.auth
+    require_role(user, ['owner', 'manager', 'superadmin'])
+    branch = getattr(user, 'branch', None)
+    if not branch:
+        branch = Branch.objects.first()
+    if not branch:
+        branch = Branch.objects.create(name="Main Showroom", is_active=True)
+    setting, _ = InvoiceSetting.objects.get_or_create(branch=branch)
+
+    update_data = payload.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None:
+            setattr(setting, field, value)
+    setting.save()
+    return setting
+
+
+@router.post("/billing/invoice-settings/reset-demo/", response=InvoiceSettingOut, auth=jwt_auth)
+def reset_demo_invoice_settings(request):
+    """
+    Reset invoice configuration to Shree Balaji Abharan Angadi (Gadag) reference profile.
+    Restricted to Store Owners and Managers.
+    """
+    user = request.auth
+    require_role(user, ['owner', 'manager', 'superadmin'])
+    branch = getattr(user, 'branch', None)
+    if not branch:
+        branch = Branch.objects.first()
+    if not branch:
+        branch = Branch.objects.create(name="Main Showroom", is_active=True)
+    setting, _ = InvoiceSetting.objects.get_or_create(branch=branch)
+    setting.header_invocation = "|| ಶ್ರೀ ಶಾಂತೇರಿ ಪ್ರಸನ್ನ ||"
+    setting.shop_name_primary = "Shree Balaji Abharan Angadi"
+    setting.shop_name_secondary = "ಶ್ರೀ ಬಾಲಾಜಿ ಆಭರಣ ಅಂಗಡಿ"
+    setting.tagline = "Gold & Silver Merchants"
+    setting.address_primary = "Beside Mukkal Basaveshwar Temple, Old Shroff Bazar, GADAG-582101"
+    setting.address_secondary = "ಮುಕ್ಕಾಲ ಬಸವೇಶ್ವರ ದೇವಸ್ಥಾನದ ಹತ್ತಿರ, ಹಳೇ ಸರಾಫ ಬಜಾರ, ಗದಗ-582101"
+    setting.phone_landline = "(08372) 238391"
+    setting.phone_mobile_1 = "9449642640"
+    setting.phone_mobile_2 = "7760755515"
+    setting.email = "Ranjanbalaji93@gmail.com"
+    setting.gstin = "29ADNPP6515B1ZF"
+    setting.pan_number = "ADNPP6515B"
+    setting.state_name = "Karnataka"
+    setting.state_code = "29"
+    setting.bis_hallmark_licence = "HM/C-7891234"
+    setting.template_style = "traditional_bilingual"
+    setting.default_paper_size = "A4"
+    setting.show_invocation = True
+    setting.show_bilingual_header = True
+    setting.show_huid = True
+    setting.show_purity = True
+    setting.show_gross_net_weight = True
+    setting.show_wastage = True
+    setting.show_making_charge = True
+    setting.show_stone_details = True
+    setting.show_rate_per_gram = True
+    setting.show_old_gold_section = True
+    setting.show_upi_qr = True
+    setting.show_bank_details = True
+    setting.show_customer_address = True
+    setting.show_hallmark_badge = True
+    setting.bank_name = "State Bank of India"
+    setting.account_name = "Shree Balaji Abharan Angadi"
+    setting.account_number = "38291048591"
+    setting.ifsc_code = "SBIN0000837"
+    setting.upi_id = "9449642640@sbi"
+    setting.terms_and_conditions = (
+        "1. Exchange with in 3 days, No Guarantee For Stone Falling & Brekage.\n"
+        "2. Weight variation subject to +/- 10mg tolerance.\n"
+        "3. Certified 916/750 Hallmark Jewellery conforms to Bureau of Indian Standards (BIS).\n"
+        "4. Old Gold purchase/exchange value is calculated after melting assay & karat verification.\n"
+        "5. Subject to Gadag jurisdiction only."
+    )
+    setting.declaration = "Certified that the particulars given above are true and correct and price charged is legal."
+    setting.signatory_title = "For, Shree Balaji Abharan Angadi"
+    setting.save()
+    return setting
 
 
 # ==============================================================================
@@ -369,14 +544,27 @@ def cancel_sale(request, sale_id: int):
                 branch=sale.branch,
             )
 
+            # Reactivate item in inventory if stock was returned
+            if item.product:
+                summary = StockSummary.objects.filter(product=item.product).first()
+                if summary and summary.quantity_on_hand > 0:
+                    item.product.is_active = True
+                    item.product.save(update_fields=['is_active', 'updated_at'])
+                    Item.objects.filter(qr_code=item.product.sku).update(
+                        status=Item.Status.AVAILABLE,
+                        locked_by_bill=None
+                    )
+
         # 2. Reverse cash intake in DayBook if applicable
         cash_paid = sum(p.amount for p in sale.payments.filter(method='cash'))
         if cash_paid > Decimal('0.00'):
             today = timezone.localdate()
-            day_book, _ = DayBook.objects.get_or_create(
+            day_book, _ = DayBook.objects.select_for_update().get_or_create(
                 date=today, branch=sale.branch,
                 defaults={'opening_balance': Decimal('0.00')}
             )
+            if day_book.is_closed:
+                return 400, {"error": "Cannot process cash refund: today's DayBook is closed. Reopen DayBook first."}
             day_book.cash_out += cash_paid
             day_book.save(update_fields=['cash_out', 'updated_at'])
 
@@ -425,10 +613,12 @@ def add_sale_payment(request, sale_id: int, payload: AddPaymentIn):
         # If payment is cash, record in DayBook
         if payload.method.lower() == 'cash':
             today = timezone.localdate()
-            day_book, _ = DayBook.objects.get_or_create(
+            day_book, _ = DayBook.objects.select_for_update().get_or_create(
                 date=today, branch=sale.branch,
                 defaults={'opening_balance': Decimal('0.00')}
             )
+            if day_book.is_closed:
+                return 400, {"error": "Cannot accept cash payment: today's DayBook is closed. Reopen DayBook first."}
             day_book.cash_in += amount
             day_book.save(update_fields=['cash_in', 'updated_at'])
 

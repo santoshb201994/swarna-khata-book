@@ -7,7 +7,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.billing.models import Bill, Item, IdempotencyRecord
-from ninja_api.auth import bill_jwt_auth, generate_bill_token
+from ninja_api.auth import bill_jwt_auth, generate_bill_token, jwt_auth
 from ninja_api.schemas import (
     BillCreateResponse, BillDetailResponse, ScanItemIn, ScanItemResponse, ItemOut
 )
@@ -19,14 +19,17 @@ router = Router(tags=["Authoritative Bill Cart & Mobile QR Polling"])
 # 1. CREATE BILL & ISSUE SCOPED JWT
 # ==============================================================================
 
-@router.post("/bills/", response={201: BillCreateResponse, 400: dict}, auth=None)
+@router.post("/bills/", response={201: BillCreateResponse, 400: dict}, auth=jwt_auth)
 def create_bill(request):
     """
     Creates a new draft Bill and returns a scoped JWT token bound to this bill_id
-    and the current PostgreSQL tenant schema.
+    and the authenticated user's PostgreSQL tenant schema.
     """
-    tenant = getattr(request, 'tenant', None)
-    schema_name = tenant.schema_name if tenant else 'public'
+    user = request.auth
+    schema_name = getattr(user, 'tenant_schema', None)
+    if not schema_name or schema_name == 'public':
+        tenant = getattr(request, 'tenant', None)
+        schema_name = tenant.schema_name if tenant else 'public'
 
     bill = Bill.objects.create(status=Bill.Status.DRAFT)
     token = generate_bill_token(tenant_schema=schema_name, bill_id=bill.id)

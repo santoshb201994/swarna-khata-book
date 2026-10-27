@@ -7,3 +7,69 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 }
+
+/* ==============================================================================
+   BULLETPROOF PRINT MEDIA STYLES FOR HIGH-PRECISION INVOICE & BILL PRINTING
+   ============================================================================== */
+@media print {
+  @page {
+    margin: 8mm;
+    size: auto;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app shell, top navbar, tab menus, action buttons, notifications */
+  header,
+  nav,
+  aside,
+  footer,
+  .print\:hidden,
+  [data-toaster],
+  button {
+    display: none !important;
+  }
+
+  /* Unset fixed modal backdrops so printable content flows onto paper */
+  .fixed {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Format printable bill canvas cleanly */
+  #printable-invoice {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Ensure table borders and rows are cleanly paginated */
+  table, tr, td, th {
+    page-break-inside: avoid;
+  }
+}

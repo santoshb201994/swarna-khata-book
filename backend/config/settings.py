@@ -7,10 +7,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
+
+# Production guardrail: In production (DEBUG=False), ALLOWED_HOSTS must be explicit
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
     default='localhost,127.0.0.1,testserver,.localhost',
-    cast=lambda v: [s.strip() for s in v.split(',')]
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
+
+# Dynamic CSRF trusted origins: Development permits local/tunnel URLs; production uses env var
+DEFAULT_CSRF_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://localhost:5173',
+]
+if DEBUG:
+    DEFAULT_CSRF_ORIGINS.append('https://*.trycloudflare.com')
+
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default=','.join(DEFAULT_CSRF_ORIGINS),
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
 # ==============================================================================

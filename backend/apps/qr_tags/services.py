@@ -49,11 +49,17 @@ def generate_qr_for_product(product):
 async def generate_qr_batch_async(products):
     """
     Asynchronously generate QR tags for a list of products in parallel.
-    Uses asyncio.to_thread to offload CPU-bound PIL image creation and disk I/O
-    without blocking the server event loop.
+    Safely captures the active tenant schema to prevent thread-local isolation loss.
     """
     import asyncio
+    from django.db import connection
+    from django_tenants.utils import schema_context
+    current_schema = getattr(connection, 'schema_name', 'public')
 
-    tasks = [asyncio.to_thread(generate_qr_for_product, product) for product in products]
+    def _threaded_qr(prod):
+        with schema_context(current_schema):
+            return generate_qr_for_product(prod)
+
+    tasks = [asyncio.to_thread(_threaded_qr, product) for product in products]
     results = await asyncio.gather(*tasks)
     return list(results)

@@ -50,28 +50,34 @@ async def sync_live_rates_async(user=None, branch=None, base_24k_rate: Decimal =
     purities = await sync_to_async(get_purities)()
 
     def persist_rate(purity, rate_value):
-        rate_record, _ = GoldRate.objects.get_or_create(
+        rate_record = GoldRate.objects.filter(
             purity=purity,
             effective_date=today,
             branch=branch,
-            defaults={
-                'rate_per_gram': rate_value,
-                'is_current': True,
-                'entered_by': user,
-            }
-        )
-        if rate_record.rate_per_gram != rate_value or not rate_record.is_current:
-            rate_record.rate_per_gram = rate_value
-            rate_record.is_current = True
-            rate_record.entered_by = user
-            rate_record.save()
+        ).order_by('-created_at').first()
+
+        if rate_record:
+            if rate_record.rate_per_gram != rate_value or not rate_record.is_current:
+                rate_record.rate_per_gram = rate_value
+                rate_record.is_current = True
+                rate_record.entered_by = user
+                rate_record.save()
+        else:
+            rate_record = GoldRate.objects.create(
+                purity=purity,
+                effective_date=today,
+                branch=branch,
+                rate_per_gram=rate_value,
+                is_current=True,
+                entered_by=user,
+            )
         return rate_record
 
     for purity in purities:
-        # Match rate by key in name or code
+        # Match rate by key in name
         matched_rate = None
         for key, val in market_rates.items():
-            if key in purity.name or key in purity.code:
+            if key.lower() in purity.name.lower():
                 matched_rate = val
                 break
 
@@ -128,6 +134,10 @@ async def sync_rates_from_source(source_id: str, branch=None, user=None, tenant_
                         if key_tag in purity_name_upper:
                             matched_val = val
                             break
+                        # Handle silver matching across variations ("Silver (925)", "925 Sterling Silver", "Silver Ornaments")
+                        if ('SILVER' in key.upper() or '925' in key.upper()) and ('SILVER' in purity_name_upper or '925' in purity_name_upper):
+                            matched_val = val
+                            break
 
                     if matched_val is not None:
                         # Deactivate prior current rates
@@ -135,18 +145,28 @@ async def sync_rates_from_source(source_id: str, branch=None, user=None, tenant_
                             purity=purity,
                             branch=resolved_branch,
                             is_current=True
-                        ).exclude(effective_date=effective_date).update(is_current=False)
+                        ).update(is_current=False)
 
-                        rate_obj, _ = GoldRate.objects.update_or_create(
+                        rate_obj = GoldRate.objects.filter(
                             purity=purity,
                             branch=resolved_branch,
-                            effective_date=effective_date,
-                            defaults={
-                                'rate_per_gram': matched_val,
-                                'is_current': True,
-                                'entered_by': user,
-                            }
-                        )
+                            effective_date=effective_date
+                        ).order_by('-created_at').first()
+
+                        if rate_obj:
+                            rate_obj.rate_per_gram = matched_val
+                            rate_obj.is_current = True
+                            rate_obj.entered_by = user
+                            rate_obj.save()
+                        else:
+                            rate_obj = GoldRate.objects.create(
+                                purity=purity,
+                                branch=resolved_branch,
+                                effective_date=effective_date,
+                                rate_per_gram=matched_val,
+                                is_current=True,
+                                entered_by=user,
+                            )
                         entered_name = "Admin"
                         if user:
                             entered_name = getattr(user, 'username', 'Admin')

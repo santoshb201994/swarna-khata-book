@@ -35,12 +35,19 @@ class DayBookAccountingTestCase(TestCase):
                 role=User.Role.STAFF,
                 branch=cls.branch,
             )
+            cls.owner = User.objects.create_user(
+                username="shop_owner_acc",
+                password="OwnerPass@123",
+                role=User.Role.OWNER,
+                branch=cls.branch,
+            )
 
     def setUp(self):
         self.client = TestClient()
         with schema_context(self.tenant.schema_name):
             self.accountant_token = create_token(self.accountant)
             self.cashier_token = create_token(self.cashier)
+            self.owner_token = create_token(self.owner)
 
     def test_get_today_day_book(self):
         with schema_context(self.tenant.schema_name):
@@ -113,3 +120,76 @@ class DayBookAccountingTestCase(TestCase):
                 HTTP_X_TENANT='demo'
             )
             self.assertEqual(close_res.status_code, 403)
+
+    def test_close_day_book_alias_and_empty_payload(self):
+        """Verify closing day using alias endpoint without payload works cleanly."""
+        with schema_context(self.tenant.schema_name):
+            from django.utils import timezone
+            import datetime
+            yesterday = timezone.localdate() - datetime.timedelta(days=1)
+            day, _ = DayBook.objects.get_or_create(date=yesterday, branch=self.branch, defaults={'is_closed': False})
+            day.is_closed = False
+            day.save()
+            res = self.client.post(
+                f'/api/day-book/{day.id}/close_day/',
+                HTTP_AUTHORIZATION=f'Bearer {self.owner_token}',
+                HTTP_X_TENANT='demo'
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.json()['is_closed'])
+
+    def test_patch_day_book_cash(self):
+        """Verify PATCH /api/day-book/{id}/ directly updates cash_in / cash_out."""
+        with schema_context(self.tenant.schema_name):
+            from django.utils import timezone
+            import datetime
+            other_date = timezone.localdate() - datetime.timedelta(days=2)
+            day, _ = DayBook.objects.get_or_create(date=other_date, branch=self.branch, defaults={'cash_in': Decimal('100.00'), 'is_closed': False})
+            day.is_closed = False
+            day.save()
+            res = self.client.patch(
+                f'/api/day-book/{day.id}/',
+                data=json.dumps({"cash_in": "350.00", "notes": "Adjusted receipt"}),
+                content_type='application/json',
+                HTTP_AUTHORIZATION=f'Bearer {self.accountant_token}',
+                HTTP_X_TENANT='demo'
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(Decimal(res.json()['cash_in']), Decimal('350.00'))
+
+    def test_manual_gold_rate_update(self):
+        """Verify POST /api/gold-rates/ works with purity_id and marks previous rates inactive."""
+        from apps.products.models import Purity
+        from apps.accounting.models import GoldRate
+        with schema_context(self.tenant.schema_name):
+            from django.utils import timezone
+            purity = Purity.objects.create(name="22KT (916)", fineness=Decimal("0.916"))
+            # Initial rate
+            GoldRate.objects.create(
+                purity=purity,
+                rate_per_gram=Decimal("6500.00"),
+                is_current=True,
+                effective_date=timezone.localdate(),
+                branch=self.branch,
+                entered_by=self.owner
+            )
+
+            # Update rate using purity_id
+            res = self.client.post(
+                '/api/gold-rates/',
+                data=json.dumps({
+                    "purity_id": purity.id,
+                    "rate_per_gram": "6850.00",
+                    "is_current": True,
+                }),
+                content_type='application/json',
+                HTTP_AUTHORIZATION=f'Bearer {self.owner_token}',
+                HTTP_X_TENANT='demo'
+            )
+            self.assertEqual(res.status_code, 201)
+            self.assertEqual(Decimal(res.json()['rate_per_gram']), Decimal('6850.00'))
+
+            # Verify active rate is only the latest one
+            active_rates = GoldRate.objects.filter(purity=purity, branch=self.branch, is_current=True)
+            self.assertEqual(active_rates.count(), 1)
+            self.assertEqual(active_rates.first().rate_per_gram, Decimal("6850.00"))

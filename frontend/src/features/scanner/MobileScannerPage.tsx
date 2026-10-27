@@ -25,6 +25,12 @@ export const MobileScannerPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id') || '';
   const pairingCode = searchParams.get('code') || '';
+  const tenantParam = searchParams.get('tenant') || '';
+
+  const [tenantSchema, setTenantSchema] = useState<string>(() => {
+    if (!sessionId) return tenantParam;
+    return sessionStorage.getItem(`pos_tenant_${sessionId}`) || tenantParam || '';
+  });
 
   const [mobileToken, setMobileToken] = useState<string | null>(() => {
     if (!sessionId) return null;
@@ -97,25 +103,35 @@ export const MobileScannerPage: React.FC = () => {
           session_id: sessionId,
           pairing_code: pairingCode,
           device_info: `${navigator.userAgent.slice(0, 80)}`,
+          tenant_schema: tenantSchema || tenantParam || undefined,
         });
 
-        const { mobile_token, user_name, branch_name } = res.data;
+        const { mobile_token, user_name, branch_name, tenant_schema: serverTenant } = res.data;
         const newStoreInfo = { userName: user_name, branchName: branch_name };
+        const resolvedTenant = serverTenant || tenantSchema || tenantParam || '';
 
         setMobileToken(mobile_token);
         setStoreInfo(newStoreInfo);
+        if (resolvedTenant) {
+          setTenantSchema(resolvedTenant);
+        }
 
         try {
           sessionStorage.setItem(
             `pos_mobile_${sessionId}`,
             JSON.stringify({ token: mobile_token, storeInfo: newStoreInfo })
           );
+          if (resolvedTenant) {
+            sessionStorage.setItem(`pos_tenant_${sessionId}`, resolvedTenant);
+          }
         } catch {
           // ignore
         }
 
         // Clean URL to prevent pairing code replay on reload
-        const newUrl = `${window.location.pathname}?session_id=${sessionId}`;
+        const newUrl = `${window.location.pathname}?session_id=${sessionId}${
+          resolvedTenant ? `&tenant=${encodeURIComponent(resolvedTenant)}` : ''
+        }`;
         window.history.replaceState({}, document.title, newUrl);
       } catch (err: any) {
         const msg = err.response?.data?.error || 'Failed to pair device. Code may be invalid or expired.';
@@ -145,9 +161,9 @@ export const MobileScannerPage: React.FC = () => {
     const host = window.location.host;
     const wsUrl = `${protocol}//${host}/ws/mobile/?session_id=${encodeURIComponent(
       sessionId
-    )}&token=${encodeURIComponent(mobileToken)}&device_info=${encodeURIComponent(
-      navigator.userAgent.slice(0, 60)
-    )}`;
+    )}&token=${encodeURIComponent(mobileToken)}&tenant=${encodeURIComponent(
+      tenantSchema || ''
+    )}&device_info=${encodeURIComponent(navigator.userAgent.slice(0, 60))}`;
 
     setWsStatus('connecting');
 
@@ -280,7 +296,10 @@ export const MobileScannerPage: React.FC = () => {
             timestamp,
           },
           {
-            headers: { Authorization: `Bearer ${mobileToken}` },
+            headers: {
+              Authorization: `Bearer ${mobileToken}`,
+              'X-Tenant': tenantSchema || 'demo',
+            },
           }
         );
         const prod = res.data.product;

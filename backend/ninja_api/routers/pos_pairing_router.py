@@ -46,7 +46,14 @@ def redeem_pos_pairing_token(request, payload: RedeemPairingIn):
     Mobile scanner device redeems the short-lived pairing code from the QR scan.
     """
     try:
-        res = redeem_pairing_code(payload.session_id, payload.pairing_code, payload.device_info or '')
+        tenant = getattr(request, 'tenant', None)
+        schema_name = payload.tenant_schema or (tenant.schema_name if tenant else None)
+        res = redeem_pairing_code(
+            payload.session_id,
+            payload.pairing_code,
+            payload.device_info or '',
+            tenant_schema=schema_name
+        )
         return 200, res
     except ValueError as e:
         return 400, {"error": str(e)}
@@ -81,28 +88,37 @@ def mobile_scan_fallback(request, payload: MobileScanIn):
         return 401, {"error": "Expired or invalid mobile session token"}
 
     session_id = claims.get('session_id')
-    session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).first()
-    if not session:
-        return 404, {"error": "Pairing session is no longer active"}
+    tenant_schema = claims.get('tenant_schema')
 
-    prod_data, error_msg, is_dup = resolve_and_record_scan(session, payload.event_id, payload.qr_payload)
+    from django_tenants.utils import schema_context
+    def _execute_scan():
+        session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).first()
+        if not session:
+            return 404, {"error": "Pairing session is no longer active"}
 
-    if is_dup:
-        return 200, {"status": "duplicate", "event_id": payload.event_id}
+        prod_data, error_msg, is_dup = resolve_and_record_scan(session, payload.event_id, payload.qr_payload)
 
-    if not prod_data:
-        return 404, {"error": error_msg}
+        if is_dup:
+            return 200, {"status": "duplicate", "event_id": payload.event_id}
 
-    # Broadcast to laptop POS WebSocket
-    async_to_sync(hub.broadcast_to_laptop)(session_id, {
-        "type": "item_scanned",
-        "event_id": payload.event_id,
-        "product": prod_data,
-        "timestamp": payload.timestamp,
-    })
+        if not prod_data:
+            return 404, {"error": error_msg}
 
-    return 200, {
-        "status": "success",
-        "event_id": payload.event_id,
-        "product": prod_data,
-    }
+        # Broadcast to laptop POS WebSocket
+        async_to_sync(hub.broadcast_to_laptop)(session_id, {
+            "type": "item_scanned",
+            "event_id": payload.event_id,
+            "product": prod_data,
+            "timestamp": payload.timestamp,
+        })
+
+        return 200, {
+            "status": "success",
+            "event_id": payload.event_id,
+            "product": prod_data,
+        }
+
+    if tenant_schema and tenant_schema != 'public':
+        with schema_context(tenant_schema):
+            return _execute_scan()
+    return _execute_scan()

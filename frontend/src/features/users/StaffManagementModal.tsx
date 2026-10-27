@@ -12,6 +12,7 @@ import api from '../../api/client';
 import { PasswordPolicyChecklist } from '../../components/PasswordPolicyChecklist';
 import { validatePasswordPolicy } from '../../utils/passwordPolicy';
 import toast from 'react-hot-toast';
+import { ROLE_LEVELS, getRoleRank } from '../../utils/rbac';
 
 interface UserItem {
   id: number;
@@ -41,6 +42,8 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'list' | 'add'>('list');
+
+  const callerRank = getRoleRank(currentUserRole);
 
   // Form states for adding new staff
   const [username, setUsername] = useState('');
@@ -240,7 +243,9 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
                   {filteredUsers.map((u) => {
-                    const isSelf = currentUserRole === 'owner' && u.role === 'owner';
+                    const targetRank = getRoleRank(u.role);
+                    const canManage = callerRank > targetRank;
+
                     return (
                       <div
                         key={u.id}
@@ -281,41 +286,47 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Actions */}
+                        {/* Actions: only allowed if caller outranks target in hierarchy */}
                         <div className="flex items-center gap-2 self-end sm:self-center">
-                          <button
-                            onClick={() => {
-                              setResetTargetUser(u);
-                              setNewPassword('');
-                            }}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
-                            title="Reset Password"
-                          >
-                            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Reset Pwd</span>
-                          </button>
+                          {canManage ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setResetTargetUser(u);
+                                  setNewPassword('');
+                                }}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                                title="Reset Password"
+                              >
+                                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Reset Pwd</span>
+                              </button>
 
-                          {!isSelf && (
-                            <button
-                              onClick={() => handleToggleStatus(u)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                                u.is_active
-                                  ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                              }`}
-                            >
-                              {u.is_active ? (
-                                <>
-                                  <UserX className="w-3.5 h-3.5" />
-                                  <span>Deactivate</span>
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  <span>Activate</span>
-                                </>
-                              )}
-                            </button>
+                              <button
+                                onClick={() => handleToggleStatus(u)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                                  u.is_active
+                                    ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                }`}
+                              >
+                                {u.is_active ? (
+                                  <>
+                                    <UserX className="w-3.5 h-3.5" />
+                                    <span>Deactivate</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span>Activate</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-medium text-slate-400 italic px-2">
+                              Protected
+                            </span>
                           )}
                         </div>
                       </div>
@@ -352,8 +363,12 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                   >
                     <option value="staff">Salesman / Cashier (POS & Billing Only)</option>
-                    <option value="manager">Showroom Manager (Operations & Rates)</option>
-                    <option value="accountant">Accountant (Daybook & Ledgers)</option>
+                    {callerRank > ROLE_LEVELS.accountant && (
+                      <option value="accountant">Accountant (Daybook & Ledgers)</option>
+                    )}
+                    {callerRank > ROLE_LEVELS.manager && (
+                      <option value="manager">Showroom Manager (Operations & Rates)</option>
+                    )}
                   </select>
                 </div>
 
