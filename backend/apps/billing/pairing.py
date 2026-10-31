@@ -206,6 +206,7 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
     target_id = None
     target_sku = None
     target_huid = None
+    data = None
 
     trimmed_payload = qr_payload.strip()
     try:
@@ -219,6 +220,60 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
     except (json.JSONDecodeError, ValueError):
         # Plain string payload (SKU or HUID)
         target_sku = trimmed_payload
+
+    # 2b. Check if this is a Tray / Group QR code
+    tray_obj = None
+    if isinstance(data, dict) and (data.get('type') == 'tray' or data.get('tray_id') or (data.get('code') and str(data.get('code')).upper().startswith('TRAY-'))):
+        from apps.qr_tags.models import Tray
+        t_id = data.get('tray_id')
+        t_code = data.get('code')
+        if t_id:
+            tray_obj = Tray.objects.filter(id=t_id).prefetch_related('items').first()
+        if not tray_obj and t_code:
+            tray_obj = Tray.objects.filter(code__iexact=t_code).prefetch_related('items').first()
+    elif target_sku and target_sku.upper().startswith('TRAY-'):
+        from apps.qr_tags.models import Tray
+        tray_obj = Tray.objects.filter(code__iexact=target_sku).prefetch_related('items').first()
+
+    if tray_obj:
+        ScannedItemAudit.objects.create(
+            event_id=event_id,
+            session=session,
+            product=None,
+            qr_payload=qr_payload[:500],
+            is_successful=True,
+        )
+        tray_items_data = []
+        for p in tray_obj.items.filter(is_active=True).select_related('category', 'purity'):
+            tray_items_data.append({
+                "id": p.id,
+                "name": p.name,
+                "sku": p.sku,
+                "category": p.category_id,
+                "category_name": p.category.name if p.category else "Jewellery",
+                "purity": p.purity_id,
+                "purity_name": p.purity.name if p.purity else "22KT",
+                "gross_weight": str(p.gross_weight),
+                "stone_weight": str(p.stone_weight),
+                "other_weight": str(p.other_weight),
+                "net_weight": str(p.net_weight),
+                "making_charge_type": p.making_charge_type,
+                "making_charge_value": str(p.making_charge_value),
+                "hsn_code": p.hsn_code,
+                "huid": p.huid,
+                "photo_url": p.photo.url if p.photo else None,
+                "is_active": p.is_active,
+                "in_stock": True,
+                "quantity_on_hand": 1,
+            })
+        return {
+            "is_tray": True,
+            "tray_id": tray_obj.id,
+            "tray_code": tray_obj.code,
+            "tray_name": tray_obj.name,
+            "total_items": len(tray_items_data),
+            "items": tray_items_data,
+        }, None, False
 
     # 3. Resolve Product in DB
     query = Product.objects.filter(is_active=True).select_related('category', 'purity', 'branch')

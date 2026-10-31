@@ -12,6 +12,7 @@ from .pairing import verify_mobile_token, resolve_and_record_scan
 from .ws_hub import hub
 
 logger = logging.getLogger("pos_sync")
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 
 def parse_query_string(query_string_bytes: bytes) -> dict[str, str]:
@@ -113,6 +114,7 @@ async def pos_websocket_app(scope, receive, send):
 
     # Accept connection
     await send({"type": "websocket.accept"})
+    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, tenant_schema, session.user_id)
 
     async def send_json(data: dict):
         try:
@@ -175,6 +177,7 @@ async def mobile_websocket_app(scope, receive, send):
 
     # Accept connection
     await send({"type": "websocket.accept"})
+    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, tenant_schema, session.user_id)
 
     async def send_json(data: dict):
         try:
@@ -242,23 +245,48 @@ async def mobile_websocket_app(scope, receive, send):
                                 "status": "duplicate",
                             })
                         elif prod_data:
-                            # Push real-time to Laptop POS
-                            await hub.broadcast_to_laptop(session_id, {
-                                "type": "item_scanned",
-                                "event_id": event_id,
-                                "product": prod_data,
-                                "timestamp": timestamp,
-                            })
-                            # Send success ack to phone
-                            await send_json({
-                                "type": "scan_ack",
-                                "event_id": event_id,
-                                "status": "success",
-                                "item_name": prod_data["name"],
-                                "sku": prod_data["sku"],
-                                "purity": prod_data["purity_name"],
-                                "net_weight": prod_data["net_weight"],
-                            })
+                            if prod_data.get('is_tray'):
+                                audit_logger.info(
+                                    "WS_TRAY_SCANNED: session_id=%s code='%s' items=%s",
+                                    session_id, prod_data.get('tray_code'), prod_data.get('total_items')
+                                )
+                                await hub.broadcast_to_laptop(session_id, {
+                                    "type": "tray_scanned",
+                                    "event_id": event_id,
+                                    "tray": prod_data,
+                                    "timestamp": timestamp,
+                                })
+                                await send_json({
+                                    "type": "scan_ack",
+                                    "event_id": event_id,
+                                    "status": "success",
+                                    "item_name": prod_data["tray_name"],
+                                    "sku": prod_data["tray_code"],
+                                    "purity": f"{prod_data['total_items']} items",
+                                    "net_weight": f"Tray ({prod_data['total_items']} pcs)",
+                                })
+                            else:
+                                audit_logger.info(
+                                    "WS_ITEM_SCANNED: session_id=%s sku='%s' product_id=%s name='%s'",
+                                    session_id, prod_data.get('sku'), prod_data.get('id'), prod_data.get('name')
+                                )
+                                # Push real-time to Laptop POS
+                                await hub.broadcast_to_laptop(session_id, {
+                                    "type": "item_scanned",
+                                    "event_id": event_id,
+                                    "product": prod_data,
+                                    "timestamp": timestamp,
+                                })
+                                # Send success ack to phone
+                                await send_json({
+                                    "type": "scan_ack",
+                                    "event_id": event_id,
+                                    "status": "success",
+                                    "item_name": prod_data["name"],
+                                    "sku": prod_data["sku"],
+                                    "purity": prod_data["purity_name"],
+                                    "net_weight": prod_data["net_weight"],
+                                })
                         else:
                             # Not found or unauthorized
                             await send_json({

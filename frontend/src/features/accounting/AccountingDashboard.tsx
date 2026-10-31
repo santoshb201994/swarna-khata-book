@@ -114,7 +114,9 @@ export const AccountingDashboard: React.FC = () => {
       toast.error('Day is already closed');
       return;
     }
-    if (!confirm('Are you sure you want to close the business day? This finalizes the closing cash balance.')) return;
+    // Show confirmation via toast - native confirm() is not mobile-friendly
+    const confirmed = window.confirm('Close the business day? This will finalize today\'s closing cash balance and lock new transactions.');
+    if (!confirmed) return;
 
     try {
       const res = await api.post(`/day-book/${dayBook.id}/close/`, { notes: '' });
@@ -128,7 +130,8 @@ export const AccountingDashboard: React.FC = () => {
 
   const handleReopenDay = async () => {
     if (!dayBook) return;
-    if (!confirm("Reopen today's business day book?")) return;
+    const confirmed = window.confirm("Reopen today's business day book? This will allow new cash entries and transactions.");
+    if (!confirmed) return;
 
     try {
       const res = await api.post(`/day-book/${dayBook.id}/reopen/`);
@@ -147,6 +150,10 @@ export const AccountingDashboard: React.FC = () => {
     const rateVal = parseFloat(newRateValue);
     if (isNaN(rateVal) || rateVal <= 0) {
       toast.error('Please enter a valid rate greater than 0');
+      return;
+    }
+    if (rateVal > 999999) {
+      toast.error('Rate seems unrealistically high. Please verify.');
       return;
     }
 
@@ -175,6 +182,10 @@ export const AccountingDashboard: React.FC = () => {
     const amt = parseFloat(cashDeltaAmount);
     if (isNaN(amt) || amt <= 0) {
       toast.error('Please enter a valid cash amount greater than 0');
+      return;
+    }
+    if (amt > 10000000) {
+      toast.error('Amount seems unusually large (> ₹1 Crore). Please verify.');
       return;
     }
 
@@ -319,8 +330,11 @@ export const AccountingDashboard: React.FC = () => {
                     onChange={(e) => setSelectedSource(e.target.value)}
                     className="text-xs bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 font-medium text-slate-700 hover:bg-slate-100 focus:bg-white focus:outline-hidden transition-all cursor-pointer"
                     title="Select trade association or benchmark website to scrape live rates"
+                    disabled={rateSources.length === 0}
                   >
-                    {rateSources.map((src) => (
+                    {rateSources.length === 0 ? (
+                      <option value="">No sources available</option>
+                    ) : rateSources.map((src) => (
                       <option key={src.id} value={src.id}>
                         {src.name}
                       </option>
@@ -331,8 +345,8 @@ export const AccountingDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSyncRatesFromWeb}
-                  disabled={isSyncingRates}
-                  className="text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  disabled={isSyncingRates || rateSources.length === 0}
+                  className="text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Scrape and automatically update live metal rates from this website (Hierarchy Level 60+)"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRates ? 'animate-spin' : ''}`} />
@@ -448,7 +462,7 @@ export const AccountingDashboard: React.FC = () => {
                   placeholder="Amount (₹)..."
                   value={cashDeltaAmount}
                   onChange={(e) => setCashDeltaAmount(e.target.value)}
-                  className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-mono focus:bg-white"
+                  className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-mono focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                 />
                 <input
                   type="text"

@@ -50,6 +50,39 @@ test.describe('Golden Paths Feature Verification', () => {
     await expect(page).toHaveURL(/.*\/login/);
   });
 
+  test('Register Store GSTIN field auto-uppercases input', async ({ page }) => {
+    await page.goto('/login');
+    await page.click('button:has-text("Register Store")');
+
+    const gstinInput = page.locator('input[placeholder="29AAAAA0000A1Z5"]');
+    await expect(gstinInput).toBeVisible({ timeout: 8000 });
+
+    // Type lowercase — should auto-uppercase via onChange handler
+    await gstinInput.fill('29aaaaa0000a1z5');
+    const val = await gstinInput.inputValue();
+    expect(val).toBe('29AAAAA0000A1Z5');
+  });
+
+  test('Register Store rejects malformed GSTIN with toast error', async ({ page }) => {
+    await page.goto('/login');
+    await page.click('button:has-text("Register Store")');
+
+    // Fill all required fields
+    await page.fill('input[placeholder="e.g. Sri Lakshmi Jewellers"]', 'Test Jewellers');
+    await page.fill('input[placeholder="e.g. lakshmi_owner"]', `testowner${Date.now()}`);
+    await page.fill('input[placeholder="e.g. 9876543210"]', '9876543210');
+    await page.fill('input[placeholder="e.g. Gold*Vault8"]', 'Gold*Vault8');
+
+    // Fill invalid GSTIN
+    const gstinInput = page.locator('input[placeholder="29AAAAA0000A1Z5"]');
+    await gstinInput.fill('INVALIDGSTIN');
+
+    await page.click('button:has-text("Create Jewellery Store Account")');
+
+    // Should show GSTIN format error toast — not submit
+    await expect(page.locator('text=Invalid GSTIN format')).toBeVisible({ timeout: 5000 });
+  });
+
   test('Password eye toggle allows viewing and hiding entered password', async ({ page }) => {
     await page.goto('/login');
     const pwdInput = page.locator('input[placeholder="••••••••"]');

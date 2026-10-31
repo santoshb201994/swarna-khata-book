@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from decimal import Decimal, ROUND_HALF_UP
 from django.shortcuts import get_object_or_404
@@ -6,6 +7,9 @@ from django.db import transaction
 from django.utils import timezone
 from ninja import Router
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 from apps.billing.models import Sale, SaleItem, Payment, InvoiceSetting, Item
 from apps.billing.services import generate_invoice_pdf, _next_invoice_number
@@ -379,6 +383,14 @@ def create_sale_invoice(request, payload: SaleCreateIn):
 
         # Reload with relations
         sale = Sale.objects.select_related('customer', 'branch').prefetch_related('items', 'payments').get(id=sale.id)
+
+        user_name = user.username if user else 'anonymous'
+        audit_logger.info(
+            "SALE_CHECKOUT_COMPLETED: invoice=%s total=₹%s paid=₹%s balance=₹%s status=%s items=%d user='%s' branch='%s'",
+            sale.invoice_number, sale.total_amount, sale.amount_paid, sale.balance_due, sale.payment_status,
+            sale.items.count(), user_name, branch
+        )
+
         return 201, _format_sale(sale)
 
 

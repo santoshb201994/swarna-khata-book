@@ -84,6 +84,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       return;
     }
 
+    const cleanEmail = email.trim();
+    if (cleanEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const payload = {
@@ -175,7 +181,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Customer Name */}
             <div className="sm:col-span-2">
@@ -195,9 +201,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
             {/* Phone Number */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>Mobile Number</span> <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1 justify-between">
+                <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /><span>Mobile Number</span> <span className="text-rose-500">*</span></span>
+                {phone.replace(/\D/g, '').length > 0 && (
+                  <span className={`text-[10px] font-mono ${phone.replace(/\D/g, '').length === 10 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {phone.replace(/\D/g, '').length}/10
+                  </span>
+                )}
               </label>
               <input
                 type="tel"

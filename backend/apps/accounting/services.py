@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from .models import GoldRate
 from apps.products.models import Purity
+
+logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 
 # Base reference bullion pricing factors relative to pure 24KT (999) gold
@@ -196,6 +200,11 @@ async def sync_rates_from_source(source_id: str, branch=None, user=None, tenant_
                 return updated_rates
 
     updated = await sync_to_async(_persist_all)()
+
+    audit_logger.info(
+        "RATE_SCRAPE_SYNCED: source='%s' effective_date=%s updated_count=%d schema='%s'",
+        scraper.source_id, effective_date, len(updated), current_schema
+    )
 
     return {
         "source_id": scraper.source_id,

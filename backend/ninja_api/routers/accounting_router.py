@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from decimal import Decimal
 from django.shortcuts import get_object_or_404
@@ -5,6 +6,9 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q
 from ninja import Router
+
+logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 from apps.accounting.models import GoldRate, Customer, DayBook, ShopRateSetting
 from apps.products.models import Purity
@@ -253,6 +257,10 @@ def create_gold_rate(request, payload: GoldRateIn):
         )
 
     entered_by = request.auth.get_full_name() or request.auth.username if request.auth else 'Admin'
+    audit_logger.info(
+        "RATE_MANUAL_UPDATE: purity='%s' (id=%s) rate=₹%s effective=%s is_current=%s entered_by='%s' branch='%s'",
+        purity.name, rate.purity_id, rate.rate_per_gram, rate.effective_date, rate.is_current, entered_by, branch
+    )
     return 201, {
         "id": rate.id,
         "purity_id": rate.purity_id,
@@ -426,6 +434,12 @@ def record_petty_cash_entry(request, payload: CashEntryIn):
 
         day.save()
 
+    username = request.auth.username if request.auth else 'anonymous'
+    audit_logger.info(
+        "CASH_DRAWER_ENTRY: type=%s amount=₹%s note='%s' user='%s' branch='%s' running_cash=₹%s",
+        payload.entry_type.upper(), amount, payload.note or '', username, branch, day.cash_in - day.cash_out
+    )
+
     return 201, _format_daybook(day)
 
 
@@ -453,6 +467,12 @@ def _perform_close_day_book(request, day_id: int):
         if notes:
             day.notes = notes
         day.save()
+
+    username = request.auth.username if request.auth else 'anonymous'
+    audit_logger.info(
+        "DAYBOOK_CLOSE: day_id=%s date=%s closing_balance=₹%s user='%s' branch='%s'",
+        day.id, day.date, day.closing_balance, username, day.branch
+    )
 
     return 200, _format_daybook(day)
 
@@ -487,6 +507,12 @@ def reopen_day_book(request, day_id: int):
         reopen_note = f"\n[{timezone.now().strftime('%H:%M')}] DAY REOPENED by {request.auth.username}"
         day.notes = (day.notes + reopen_note).strip()
         day.save()
+
+    audit_logger.info(
+        "DAYBOOK_REOPEN: day_id=%s date=%s user='%s' branch='%s'",
+        day.id, day.date, request.auth.username, day.branch
+    )
+
     return 200, _format_daybook(day)
 
 

@@ -36,7 +36,7 @@ export const Layout: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Top Header Navbar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-auto min-h-16 py-2 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-tr from-amber-600 to-amber-400 rounded-xl flex items-center justify-center shadow-md shadow-amber-500/20 text-white font-black text-lg">
               <Sparkles className="w-5 h-5" />
@@ -51,7 +51,7 @@ export const Layout: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
             {canAccessCustomers && (
               <button
                 onClick={() => setIsCustomerModalOpen(true)}

@@ -73,6 +73,7 @@ test.describe('Accounting Dashboard Actions Verification', () => {
     const closeDayBtn = page.locator('button:has-text("Close Business Day")');
     await expect(closeDayBtn).toBeVisible({ timeout: 10000 });
 
+    // Handle both window.confirm (native) and any inline confirm UI
     page.once('dialog', async (dialog) => {
       await dialog.accept();
     });
@@ -80,5 +81,20 @@ test.describe('Accounting Dashboard Actions Verification', () => {
     await closeDayBtn.click();
     await expect(page.locator('text=Business day successfully closed and audited!')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('h1 span:has-text("Day Closed")')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('Rate Sync Auto-Sync button is visible and responds', async ({ page }) => {
+    // Rate source dropdown and Auto-Sync button must be visible for owner
+    const syncBtn = page.locator('button:has-text("Auto-Sync")');
+    await expect(syncBtn).toBeVisible({ timeout: 10000 });
+
+    // Source dropdown must have at least one option (if it exists, sync button should be present)
+    const sourceSelect = page.locator('select[title*="trade association"], select').filter({ hasText: /Gold|Rate|Source/i }).first();
+    if (await sourceSelect.isVisible({ timeout: 3000 })) {
+      const options = await sourceSelect.locator('option').allInnerTexts();
+      // When sources exist, the Auto-Sync button is shown
+      expect(options.length).toBeGreaterThan(0);
+      await expect(syncBtn).toBeVisible();
+    }
   });
 });

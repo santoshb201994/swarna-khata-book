@@ -167,6 +167,20 @@ export const POSScreen: React.FC = () => {
               setIsMobileConnected(false);
               toast('Mobile scanner disconnected', { icon: 'ℹ️' });
             }
+          } else if (data.type === 'tray_scanned') {
+            const { event_id, tray } = data;
+            if (event_id && processedEventIdsRef.current.has(event_id)) return;
+            if (event_id) processedEventIdsRef.current.add(event_id);
+
+            let addedCount = 0;
+            const addFn = addToCartRef.current;
+            if (addFn && tray.items) {
+              tray.items.forEach((p: any) => {
+                addFn(p);
+                addedCount++;
+              });
+            }
+            toast.success(`Scanned Tray "${tray.tray_name || tray.tray_code}": Added ${addedCount} items to invoice!`, { duration: 5000 });
           } else if (data.type === 'item_scanned') {
             const { event_id, product } = data;
             // Idempotency guard against duplicate delivery
@@ -315,6 +329,26 @@ export const POSScreen: React.FC = () => {
   const handleScannedQR = (qrData: string) => {
     try {
       const parsed = JSON.parse(qrData);
+
+      // Handle Group / Tray QR code
+      if (parsed && (parsed.type === 'tray' || parsed.is_tray || Array.isArray(parsed.items))) {
+        const trayItems: any[] = parsed.items || [];
+        let addedCount = 0;
+        trayItems.forEach((it) => {
+          const match = products.find((p) => p.sku === it.sku || p.id === it.id);
+          if (match && match.item_status !== 'SOLD' && match.is_active) {
+            addToCart(match);
+            addedCount++;
+          }
+        });
+        if (addedCount > 0) {
+          toast.success(`Scanned Tray "${parsed.name || parsed.code}": Added ${addedCount} items to cart!`);
+        } else {
+          toast.error(`Tray "${parsed.name || parsed.code}" scanned, but no available items found.`);
+        }
+        return;
+      }
+
       const match = products.find((p) => p.sku === parsed.sku || p.id === parsed.id);
       if (match) {
         if (match.item_status === 'SOLD' || !match.is_active) {
@@ -327,6 +361,29 @@ export const POSScreen: React.FC = () => {
         toast.error(`Product with SKU ${parsed.sku} not in inventory or already sold`);
       }
     } catch {
+      // Check if it's a plain string Tray code
+      if (qrData.trim().toUpperCase().startsWith('TRAY-')) {
+        api.get(`/trays/by-code/${qrData.trim()}/`).then((res) => {
+          const tray = res.data;
+          let addedCount = 0;
+          (tray.items || []).forEach((it: any) => {
+            const match = products.find((p) => p.sku === it.sku || p.id === it.id);
+            if (match && match.item_status !== 'SOLD' && match.is_active) {
+              addToCart(match);
+              addedCount++;
+            }
+          });
+          if (addedCount > 0) {
+            toast.success(`Scanned Tray "${tray.name}": Added ${addedCount} items to cart!`);
+          } else {
+            toast.error(`Tray "${tray.name}" has no available items in stock.`);
+          }
+        }).catch(() => {
+          toast.error(`Tray '${qrData}' not found in inventory.`);
+        });
+        return;
+      }
+
       // If it's a plain string SKU
       const match = products.find((p) => p.sku.toLowerCase() === qrData.toLowerCase());
       if (match) {
@@ -349,6 +406,7 @@ export const POSScreen: React.FC = () => {
       toast.error(`'${product.name}' is already sold and removed from inventory.`);
       return;
     }
+
     const { rate: currentRate } = resolveProductRate(product, rawRatesRef.current, goldRatesRef.current);
     const netWt = parseFloat(product.net_weight) || 0;
     const metalVal = netWt * currentRate;
@@ -468,6 +526,10 @@ export const POSScreen: React.FC = () => {
       toast.error('Cart is empty. Add products to bill.');
       return;
     }
+    if (discVal > subtotal + gst) {
+      toast.error('Discount cannot exceed the total bill amount.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -512,7 +574,11 @@ export const POSScreen: React.FC = () => {
       // Refresh catalog from server
       fetchInitialData();
     } catch (err: any) {
-      toast.error('Checkout failed. Check stock availability.');
+      const errData = err.response?.data;
+      const errMsg = errData?.error || errData?.detail
+        || (Array.isArray(errData) ? errData[0] : null)
+        || 'Checkout failed. Please check stock availability and try again.';
+      toast.error(String(errMsg));
     } finally {
       setIsSubmitting(false);
     }
@@ -542,9 +608,15 @@ export const POSScreen: React.FC = () => {
     return (
       p.name.toLowerCase().includes(term) ||
       p.sku.toLowerCase().includes(term) ||
-      (p.huid && p.huid.toLowerCase().includes(term))
+      (p.huid && p.huid.toLowerCase().includes(term)) ||
+      (p.category_name && p.category_name.toLowerCase().includes(term))
     );
   });
+
+  // Count available items in the full catalog (for empty-state messaging)
+  const availableCatalogCount = products.filter(
+    (p) => p.item_status !== 'SOLD' && p.is_active
+  ).length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -642,7 +714,30 @@ export const POSScreen: React.FC = () => {
           {/* Product Items Table */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden max-h-[520px] overflow-y-auto">
             <div className="divide-y divide-slate-100">
-              {filteredCatalog.map((prod) => {
+              {filteredCatalog.length === 0 ? (
+                <div className="py-14 text-center space-y-2">
+                  {availableCatalogCount === 0 ? (
+                    <>
+                      <QrCode className="w-10 h-10 text-slate-200 mx-auto" />
+                      <p className="text-sm font-semibold text-slate-500">No active inventory items</p>
+                      <p className="text-xs text-slate-400">Add products in the Items &amp; QR Tags tab to start billing.</p>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-10 h-10 text-slate-200 mx-auto" />
+                      <p className="text-sm font-semibold text-slate-500">No items match &ldquo;{searchQuery}&rdquo;</p>
+                      <p className="text-xs text-slate-400">Try searching by item name, SKU, HUID, or category.</p>
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="text-xs text-amber-700 font-bold hover:underline"
+                      >
+                        Clear search
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+              filteredCatalog.map((prod) => {
                 const { rate: currentRate, metalType, purityLabel } = resolveProductRate(
                   prod,
                   rawRates,
@@ -713,7 +808,8 @@ export const POSScreen: React.FC = () => {
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </div>
         </div>
@@ -726,8 +822,8 @@ export const POSScreen: React.FC = () => {
                 <Receipt className="w-4 h-4 text-amber-600" />
                 <span>Current Invoice</span>
               </h3>
-              <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-mono">
-                {cart.length} items
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-md font-mono ${cart.length === 0 ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-800'}`}>
+                {cart.length === 0 ? 'Empty' : `${cart.length} item${cart.length > 1 ? 's' : ''}`}
               </span>
             </div>
 
@@ -901,6 +997,18 @@ export const POSScreen: React.FC = () => {
                 <span>Total Amount:</span>
                 <span className="text-amber-800">₹{totalPayable.toLocaleString('en-IN')}</span>
               </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Notes (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Gift, Customer request..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+              />
             </div>
 
             {/* Payment Options */}

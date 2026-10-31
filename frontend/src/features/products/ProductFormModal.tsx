@@ -103,14 +103,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   }, [isOpen]);
 
-  const netWeight = (
-    Math.max(
-      0,
-      (parseFloat(grossWeight) || 0) -
-        (parseFloat(stoneWeight) || 0) -
-        (parseFloat(otherWeight) || 0)
-    )
-  ).toFixed(3);
+  const rawNetWeight = (parseFloat(grossWeight) || 0) - (parseFloat(stoneWeight) || 0) - (parseFloat(otherWeight) || 0);
+  const netWeight = Math.max(0, rawNetWeight).toFixed(3);
+  const isNetWeightWarning = rawNetWeight < 0;
 
   const generateRandomSku = () => {
     const prefix = 'JW';
@@ -127,6 +122,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     e.preventDefault();
     if (!name || !sku || !grossWeight) {
       toast.error('Please fill all mandatory fields (Name, SKU, Gross Weight)');
+      return;
+    }
+    const grossVal = parseFloat(grossWeight);
+    if (isNaN(grossVal) || grossVal <= 0) {
+      toast.error('Gross weight must be greater than 0');
+      return;
+    }
+    const stoneVal = parseFloat(stoneWeight) || 0;
+    const otherVal = parseFloat(otherWeight) || 0;
+    if (stoneVal + otherVal >= grossVal) {
+      toast.error('Stone weight + Other weight cannot exceed Gross weight');
       return;
     }
 
@@ -168,7 +174,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      const serverErr = err.response?.data?.error || err.response?.data?.sku;
+      const serverErr = err.response?.data?.error || (err.response?.data?.sku && `SKU: ${err.response.data.sku[0]}`) || (err.response?.data?.huid && `HUID: ${err.response.data.huid[0]}`);
       const msg = serverErr
         ? String(serverErr)
         : 'Failed to create product. Please verify inputs.';
@@ -385,8 +391,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <label className="block text-[11px] font-bold text-emerald-800 mb-1">
                     Net Pure Wt (g)
                   </label>
-                  <div className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-300 rounded-lg text-sm font-mono font-bold text-emerald-700">
+                  <div className={`px-2.5 py-1.5 rounded-lg text-sm font-mono font-bold ${isNetWeightWarning ? 'bg-rose-50 border border-rose-300 text-rose-700' : 'bg-emerald-50 border border-emerald-300 text-emerald-700'}`}>
                     {netWeight} g
+                    {isNetWeightWarning && <span className="text-[10px] block font-medium">Stone+Other exceeds Gross!</span>}
                   </div>
                 </div>
               </div>
@@ -429,9 +436,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 6-digit alphanum"
+                  placeholder="e.g. AB1234"
+                  maxLength={6}
                   value={huid}
-                  onChange={(e) => setHuid(e.target.value)}
+                  onChange={(e) => setHuid(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm uppercase font-mono focus:ring-2 focus:ring-amber-500"
                 />
               </div>

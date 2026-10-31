@@ -177,6 +177,11 @@ def create_product(request, payload: ProductIn):
     if Product.objects.filter(sku__iexact=payload.sku).exists():
         return 400, {"error": f"Product with SKU '{payload.sku}' already exists."}
 
+    # Validate that stone + other weight does not exceed gross weight
+    combined_deductions = payload.stone_weight + payload.other_weight
+    if combined_deductions >= payload.gross_weight:
+        return 400, {"error": "Stone weight + Other weight must be less than Gross weight. Net weight cannot be zero or negative."}
+
     category = get_object_or_404(Category, id=payload.category_id)
     purity = get_object_or_404(Purity, id=payload.purity_id)
 
@@ -261,6 +266,11 @@ def update_product(request, product_id: int, payload: ProductUpdateIn):
         prod.stone_weight = payload.stone_weight
     if payload.other_weight is not None:
         prod.other_weight = payload.other_weight
+
+    # Validate that stone + other weight does not exceed gross after updates are applied
+    if prod.stone_weight + prod.other_weight >= prod.gross_weight:
+        return 400, {"error": "Stone weight + Other weight must be less than Gross weight. Net weight cannot be zero or negative."}
+
     if payload.making_charge_type is not None:
         prod.making_charge_type = payload.making_charge_type
     if payload.making_charge_value is not None:

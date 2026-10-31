@@ -184,3 +184,35 @@ export interface DayBook {
   net_cash: string;
   is_closed: boolean;
 }
+
+export interface TrayItem {
+  id: number;
+  sku: string;
+  name: string;
+  category_name?: string;
+  purity?: string;
+  gross_weight: string | number;
+  net_weight: string | number;
+  stone_weight: string | number;
+  huid?: string;
+  item_status?: 'AVAILABLE' | 'IN_CART' | 'SOLD';
+  qr_code_url?: string;
+  photo_url?: string;
+}
+
+export interface Tray {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  total_items: number;
+  total_gross_weight: string | number;
+  total_net_weight: string | number;
+  total_stone_weight: string | number;
+  qr_data: string;
+  qr_image_url?: string;
+  printed_count: number;
+  items: TrayItem[];
+  created_at: string;
+  updated_at: string;
+}

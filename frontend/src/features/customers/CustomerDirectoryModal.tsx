@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Customer } from '../../types';
 import api from '../../api/client';
 import {
@@ -53,10 +53,16 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
     }
   }, [isOpen]);
 
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchQuery(val);
-    fetchCustomers(val);
+    // Debounce: wait 350ms before firing API call
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchCustomers(val);
+    }, 350);
   };
 
   const handleOpenAdd = () => {

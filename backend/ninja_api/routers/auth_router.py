@@ -1,8 +1,12 @@
+import logging
 from typing import List, Optional
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 from apps.accounts.models import User, Branch
 from ninja_api.auth import create_token, decode_token, jwt_auth, require_role, ROLE_LEVELS, ROLE_HIERARCHY
@@ -54,6 +58,8 @@ def obtain_token(request, payload: TokenRequest):
                 resolved_schema = 'public'
 
     if not user or not user.is_active:
+        client_ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR', '-')
+        audit_logger.warning("AUTH_LOGIN_FAILED: username='%s' ip='%s'", payload.username, client_ip)
         return 401, {"error": "Invalid username or password, or account inactive."}
 
     from django.db import connection
@@ -63,6 +69,12 @@ def obtain_token(request, payload: TokenRequest):
     access_token = create_token(user, token_type='access')
     refresh_token = create_token(user, token_type='refresh')
     effective_role = 'superadmin' if (user.is_superuser or user.role == 'superadmin') else user.role
+
+    client_ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR', '-')
+    audit_logger.info(
+        "AUTH_LOGIN_SUCCESS: username='%s' user_id=%s role='%s' schema='%s' ip='%s'",
+        user.username, user.id, effective_role, current_schema, client_ip
+    )
 
     return 200, {
         "access": access_token,

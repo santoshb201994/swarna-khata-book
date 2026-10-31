@@ -47,6 +47,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
 
   // Form states for adding new staff
   const [username, setUsername] = useState('');
+  // Note: username will be cleaned (lowercase, alphanumeric+underscore) on submit
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -88,10 +89,20 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
       return;
     }
 
+    const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!cleanUsername || cleanUsername.length < 3) {
+      toast.error('Username must be at least 3 characters (letters, numbers, underscore only)');
+      return;
+    }
+    if (!firstName.trim()) {
+      toast.error('First name is required');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await api.post('/users/', {
-        username: username.trim(),
+        username: cleanUsername,
         password,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -120,8 +131,10 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
 
   const handleToggleStatus = async (user: UserItem) => {
     const nextStatus = !user.is_active;
-    const actionName = nextStatus ? 'activate' : 'deactivate';
-    if (!confirm(`Are you sure you want to ${actionName} access for '${user.username}'?`)) {
+    const confirmMsg = nextStatus
+      ? `Activate account for '${user.username}'? They will be able to log in again.`
+      : `Deactivate account for '${user.username}'? They will immediately lose access to the POS.`;
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 

@@ -101,6 +101,7 @@ class ProductionTenantMiddleware(TenantMainMiddleware):
 
         request.tenant = tenant
         connection.set_tenant(request.tenant)
+        logger.debug("Resolved tenant schema '%s' for %s", tenant.schema_name, request.path)
 
         # Apply tenant specific URLCONF if configured
         self.setup_url_routing(request)

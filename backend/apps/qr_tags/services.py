@@ -1,8 +1,9 @@
 import qrcode
 import json
 import io
+from decimal import Decimal
 from django.core.files.base import ContentFile
-from .models import QRTag
+from .models import QRTag, Tray
 
 
 def generate_qr_for_product(product):
@@ -12,10 +13,10 @@ def generate_qr_for_product(product):
         'id': product.id,
         'sku': product.sku,
         'name': product.name,
-        'purity': product.purity.name,
+        'purity': product.purity.name if product.purity else '',
         'gross_wt': str(product.gross_weight),
         'net_wt': str(product.net_weight),
-        'huid': product.huid,
+        'huid': product.huid or '',
     }
     qr_payload = json.dumps(qr_data, separators=(',', ':'))
 
@@ -44,6 +45,64 @@ def generate_qr_for_product(product):
     qr_tag.qr_image.save(f'qr_{product.sku}.png', image_content, save=False)
     qr_tag.save()
     return qr_tag
+
+
+def generate_qr_for_tray(tray: Tray):
+    """Generate or update group QR code for a tray. Returns updated Tray instance."""
+    items = list(tray.items.select_related('purity', 'category').all())
+
+    total_gross = sum((i.gross_weight for i in items), Decimal('0.000'))
+    total_net = sum((i.net_weight for i in items), Decimal('0.000'))
+    total_stone = sum((i.stone_weight for i in items), Decimal('0.000'))
+
+    qr_data = {
+        'type': 'tray',
+        'tray_id': tray.id,
+        'code': tray.code,
+        'name': tray.name,
+        'total_items': len(items),
+        'gross_wt': str(total_gross),
+        'net_wt': str(total_net),
+        'stone_wt': str(total_stone),
+        'items': [
+            {
+                'id': item.id,
+                'sku': item.sku,
+                'name': item.name,
+                'purity': item.purity.name if item.purity else '',
+                'gross_wt': str(item.gross_weight),
+                'net_wt': str(item.net_weight),
+                'stone_wt': str(item.stone_weight),
+                'huid': item.huid or '',
+            }
+            for item in items
+        ]
+    }
+    qr_payload = json.dumps(qr_data, separators=(',', ':'))
+
+    # Generate QR image with Medium error correction for dense payloads
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(qr_payload)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+
+    # Save to bytes
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    image_content = ContentFile(buffer.read(), name=f'tray_qr_{tray.code}.png')
+
+    tray.qr_data = qr_payload
+    if tray.qr_image:
+        tray.qr_image.delete(save=False)
+    tray.qr_image.save(f'tray_qr_{tray.code}.png', image_content, save=False)
+    tray.save(update_fields=['qr_data', 'qr_image', 'updated_at'])
+    return tray
 
 
 async def generate_qr_batch_async(products):

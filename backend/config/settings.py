@@ -1,9 +1,17 @@
 # Django settings with django-tenants and django-ninja
+import os
+from urllib.parse import urlparse, parse_qsl
 from pathlib import Path
+from dotenv import load_dotenv
 from decouple import config
 from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Load environment variables (.env in backend or workspace root)
+load_dotenv()
+load_dotenv(BASE_DIR / '.env')
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
@@ -80,6 +88,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'apps.tenants.middleware.ProductionTenantMiddleware',
+    'config.logging_middleware.RequestLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -114,16 +123,31 @@ ASGI_APPLICATION = 'config.asgi.application'
 # ==============================================================================
 # DATABASE (PostgreSQL multi-tenant backend)
 # ==============================================================================
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': config('DB_NAME', default='swarna_khata'),
-        'USER': config('DB_USER', default='erp_admin'),
-        'PASSWORD': config('DB_PASSWORD', default='GoldShop@2026#Db'),
-        'HOST': config('DB_HOST', default='127.0.0.1'),
-        'PORT': config('DB_PORT', default='5433'),
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    tmpPostgres = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': tmpPostgres.path.replace('/', ''),
+            'USER': tmpPostgres.username,
+            'PASSWORD': tmpPostgres.password,
+            'HOST': tmpPostgres.hostname,
+            'PORT': tmpPostgres.port or 5432,
+            'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            'NAME': config('DB_NAME', default='swarna_khata'),
+            'USER': config('DB_USER', default='erp_admin'),
+            'PASSWORD': config('DB_PASSWORD', default='GoldShop@2026#Db'),
+            'HOST': config('DB_HOST', default='127.0.0.1'),
+            'PORT': config('DB_PORT', default='5433'),
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -184,3 +208,95 @@ CORS_ALLOW_HEADERS = [
     'x-tenant-domain',
     'idempotency-key',
 ]
+
+# ==============================================================================
+# LOGGING CONFIGURATION
+# ==============================================================================
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(asctime)s [%(levelname)s] [%(name)s] [%(process)d:%(thread)d] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'audit': {
+            'format': '%(asctime)s [AUDIT] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+        'file_app': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'app.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'file_errors': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'errors.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'level': 'ERROR',
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'file_audit': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'audit.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'audit',
+            'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_app', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console', 'file_app', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ninja_api': {
+            'handlers': ['console', 'file_app', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'swarnakhata.access': {
+            'handlers': ['console', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'swarnakhata.audit': {
+            'handlers': ['console', 'file_audit'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file_app'],
+        'level': 'INFO',
+    },
+}

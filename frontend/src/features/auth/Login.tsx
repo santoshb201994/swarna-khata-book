@@ -42,6 +42,27 @@ export const Login: React.FC = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Client-side validation
+    if (!regShopName.trim()) {
+      toast.error('Please enter your jewellery shop name');
+      return;
+    }
+    if (!regUsername.trim() || regUsername.trim().length < 3) {
+      toast.error('Owner username must be at least 3 characters');
+      return;
+    }
+    const cleanPhone = regPhone.trim().replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    const cleanGstin = regGstin.trim().toUpperCase();
+    if (cleanGstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}Z[A-Z\d]{1}$/.test(cleanGstin)) {
+      toast.error('Invalid GSTIN format (e.g. 29AAAAA0000A1Z5)');
+      return;
+    }
+
     const policy = validatePasswordPolicy(regPassword);
     if (!policy.isValid) {
       toast.error(policy.errors[0] || 'Password does not meet Jewellery Shield policy');
@@ -151,6 +172,8 @@ export const Login: React.FC = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                 placeholder="e.g. owner or ramesh_sales"
+                autoComplete="username"
+                autoFocus
               />
             </div>
 
@@ -166,6 +189,7 @@ export const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -323,7 +347,7 @@ export const Login: React.FC = () => {
                 <input
                   type="text"
                   value={regGstin}
-                  onChange={(e) => setRegGstin(e.target.value)}
+                  onChange={(e) => setRegGstin(e.target.value.toUpperCase())}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden uppercase"
                   placeholder="29AAAAA0000A1Z5"
                 />

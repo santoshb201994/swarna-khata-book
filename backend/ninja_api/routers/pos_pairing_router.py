@@ -105,12 +105,20 @@ def mobile_scan_fallback(request, payload: MobileScanIn):
             return 404, {"error": error_msg}
 
         # Broadcast to laptop POS WebSocket
-        async_to_sync(hub.broadcast_to_laptop)(session_id, {
-            "type": "item_scanned",
-            "event_id": payload.event_id,
-            "product": prod_data,
-            "timestamp": payload.timestamp,
-        })
+        if prod_data.get('is_tray'):
+            async_to_sync(hub.broadcast_to_laptop)(session_id, {
+                "type": "tray_scanned",
+                "event_id": payload.event_id,
+                "tray": prod_data,
+                "timestamp": payload.timestamp,
+            })
+        else:
+            async_to_sync(hub.broadcast_to_laptop)(session_id, {
+                "type": "item_scanned",
+                "event_id": payload.event_id,
+                "product": prod_data,
+                "timestamp": payload.timestamp,
+            })
 
         return 200, {
             "status": "success",

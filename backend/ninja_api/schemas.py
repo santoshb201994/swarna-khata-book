@@ -660,6 +660,56 @@ class BatchQRIn(BaseModel):
     product_ids: List[int]
 
 
+class TrayItemOut(BaseModel):
+    id: int
+    sku: str
+    name: str
+    category_name: Optional[str] = None
+    purity: Optional[str] = None
+    gross_weight: Decimal
+    net_weight: Decimal
+    stone_weight: Decimal
+    huid: Optional[str] = None
+    item_status: Optional[str] = 'AVAILABLE'
+    qr_code_url: Optional[str] = None
+    photo_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TrayOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = ""
+    total_items: int
+    total_gross_weight: Decimal
+    total_net_weight: Decimal
+    total_stone_weight: Decimal
+    qr_data: str
+    qr_image_url: Optional[str] = None
+    printed_count: int
+    items: List[TrayItemOut]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CreateTrayIn(BaseModel):
+    name: str
+    code: Optional[str] = None
+    description: Optional[str] = ""
+    product_ids: List[int]
+
+
+class UpdateTrayIn(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    description: Optional[str] = None
+    product_ids: Optional[List[int]] = None
+
+
 # ==============================================================================
 # POS PAIRING SCHEMAS
 # ==============================================================================

@@ -4,10 +4,14 @@ import io
 import json
 import zipfile
 import tempfile
+import logging
 from datetime import datetime, date
 from decimal import Decimal
 from django.utils import timezone
 from django_tenants.utils import schema_context
+
+logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger('swarnakhata.audit')
 
 from apps.tenants.models import Client
 from apps.accounts.models import User, Branch
@@ -350,6 +354,7 @@ def generate_shop_export_archive(schema_name: str, start_date: date = None, end_
     Creates a temporary compressed ZIP archive containing all operational data for a single shop.
     Returns the absolute path to the temp file.
     """
+    audit_logger.info("DATA_EXPORT_SHOP_INITIATED: schema='%s' range=%s to %s", schema_name, start_date, end_date)
     temp_zip = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
     temp_path = temp_zip.name
     temp_zip.close()
@@ -357,6 +362,7 @@ def generate_shop_export_archive(schema_name: str, start_date: date = None, end_
     with zipfile.ZipFile(temp_path, 'w', compression=zipfile.ZIP_DEFLATED) as zip_arch:
         export_tenant_data_to_zip(schema_name, zip_arch, start_date, end_date, folder_prefix="")
 
+    audit_logger.info("DATA_EXPORT_SHOP_COMPLETED: schema='%s' file='%s'", schema_name, temp_path)
     return temp_path
 
 
@@ -366,6 +372,7 @@ def generate_all_shops_export_archive(start_date: date = None, end_date: date = 
     Restricted to Developer / Superadmin.
     Returns the absolute path to the temp file.
     """
+    audit_logger.info("DATA_EXPORT_GLOBAL_INITIATED: range=%s to %s", start_date, end_date)
     temp_zip = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
     temp_path = temp_zip.name
     temp_zip.close()
