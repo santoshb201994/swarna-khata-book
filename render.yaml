@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: swarna-khata-book
+    runtime: python
+    buildCommand: ./render-build.sh
+    startCommand: uv run uvicorn config.asgi:application --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.16
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: DATABASE_URL
+        sync: false
