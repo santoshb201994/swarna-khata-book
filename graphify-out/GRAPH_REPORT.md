@@ -1,7 +1,7 @@
-# Graph Report - swarna_khata_book  (2026-11-01)
+# Graph Report - swarna_khata_book  (2026-11-02)
 
 ## Corpus Check
-- 193 files · ~94,698 words
+- 193 files · ~94,795 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .bat 3, .css 2)
 
@@ -11,14 +11,14 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d7252bc9`
+- Built from commit: `5f67f906`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - products_router.py
 - api.py
-- RateScrapeResult
+- MultiSourceGoldRateScraperTestCase
 - qr_tags_router.py
 - NinjaPOSBillingTestCase
 - tenants_router.py
@@ -37,68 +37,68 @@
 - React + TypeScript + Vite
 - Master Feature Checklist & Test Mapping
 - django_db
-- MultiSourceGoldRateScraperTestCase
+- tenants/admin.py
 - package.json
 - StockSummary
 - POSSessionHub
-- devDependencies
-- POSPairingSession
-- create_token
+- package.json
+- pos_pairing_router.py
+- backup_service.py
 - bills_router.py
 - auth_router.py
 - Product
 - websocket_handler.py
-- billing/services.py
-- vite.config.ts
-- NinjaAuthTestCase
+- create_sale
+- UUID
+- create_token
 - render-build.sh
 - DayBookAccountingTestCase
+- MultiSourceGoldRateScraperTestCase
 - logging
 - UnifiedQRArchitectureTestCase
 - SecurityAuditAndAccessControlTestCase
 - User
 - billing_router.py
 - export_tenant_data_to_zip
-- @playwright/test
+- NinjaAuthTestCase
 - logger.ts
 - scripts
-- create_sale
 - verify-before-complete.md
 - jewellery_erp_coding_workflow_mindmap.md
 - Sale
-- tenants/admin.py
+- django_contrib
 - DeveloperPortal.tsx
 - DataExportTestCase
-- DeveloperPortalTestCase
+- @playwright/test
 - TrayQRTagsTestCase
+- DeveloperPortalTestCase
 - CanaryBatchMigrator
 - services
 - download_invoice_pdf
 - pairing.py
 - Payment
-- App.tsx
+- billing/services.py
 - qrPayload.ts
 - accounting_router.py
 - vercel.json
 - ShopRateSetting
 - InvoiceSetting
 - start.sh
-- tenants/admin.py
 - JWTAuth
-- index.ts
-- UUID
+- lucide-react
+- App.tsx
 - GoldRate
+- vite.config.ts
 - resolve_and_record_scan
-- verify_mobile_token
 - metalRateHelper.ts
 - CustomUserAdmin
 - _get_encryption_key
 - MobileScannerPage.tsx
+- verify_mobile_token
 - POSPairingSession
 - react-dom
-- backup_service.py
 - Purity
-- index.ts
+- POSScreen.tsx
 - Client
 
 ## God Nodes (most connected - your core abstractions)
@@ -138,7 +138,7 @@ Nodes (19): _threaded_qr(), generate_qr_for_product(), require_role(), create_ca
 Cohesion: 0.38
 Nodes (3): not_found_handler(), permission_error_handler(), value_error_handler()
 
-### Community 2 - "RateScrapeResult"
+### Community 2 - "MultiSourceGoldRateScraperTestCase"
 Cohesion: 0.15
 Nodes (6): BaseRateScraper, RateScrapeResult, BullionDeskScraper, IBJAScraper, get_scraper(), list_available_sources()
 
@@ -194,6 +194,10 @@ Nodes (15): 1. Store Onboarding & Identity Management, 2. Developer Superadmin C
 Cohesion: 0.07
 Nodes (16): Migration, Migration, Migration, Migration, Migration, Migration, Migration, Migration (+8 more)
 
+### Community 38 - "tenants/admin.py"
+Cohesion: 0.33
+Nodes (3): ClientAdmin, DomainAdmin, DomainInline
+
 ### Community 39 - "package.json"
 Cohesion: 0.09
 Nodes (22): dependencies, axios@^1.20.0, @hookform/resolvers@^6.0.0, html5-qrcode@^2.3.8, lucide-react@^1.61.0, qrcode@^1.5.4, react@^19.3.1, react-hook-form@^7.90.0 (+14 more)
@@ -202,11 +206,11 @@ Nodes (22): dependencies, axios@^1.20.0, @hookform/resolvers@^6.0.0, html5-qrcod
 Cohesion: 0.14
 Nodes (10): StockMovement, Meta, MovementType, StockSummary, Meta, record_stock_movement(), cancel_sale(), create_stock_movement() (+2 more)
 
-### Community 44 - "devDependencies"
+### Community 44 - "package.json"
 Cohesion: 0.14
 Nodes (18): devDependencies, oxlint@^1.88.0, @playwright/test@^1.64.1, @types/node@^24.19.2, @types/react@^19.3.0, @types/react-dom@^19.3.0, typescript@~6.0.3, @vitejs/plugin-basic-ssl@^2.3.0 (+10 more)
 
-### Community 45 - "POSPairingSession"
+### Community 45 - "pos_pairing_router.py"
 Cohesion: 0.19
 Nodes (5): redeem_pairing_code(), revoke_pairing_session(), redeem_pos_pairing_token(), revoke_pos_pairing_token(), start_pos_pairing_session()
 
@@ -226,9 +230,9 @@ Nodes (5): ProductFilter, Meta, Product, Meta, developer_overview()
 Cohesion: 0.18
 Nodes (7): get_active_session(), mobile_websocket_app(), parse_query_string(), pos_websocket_app(), send_json(), validate_jwt_user(), application()
 
-### Community 53 - "vite.config.ts"
-Cohesion: 0.25
-Nodes (6): @tailwindcss/vite@^4.3.3, vite@^8.3.4, @vitejs/plugin-react@^6.1.2, @tailwindcss/vite, vite, @vitejs/plugin-react
+### Community 53 - "UUID"
+Cohesion: 0.15
+Nodes (4): Migration, Migration, Migration, RequestLoggingMiddleware
 
 ### Community 58 - "logging"
 Cohesion: 0.10
@@ -258,7 +262,7 @@ Nodes (7): scripts, build, dev, lint, preview, test:e2e, tunnel
 Cohesion: 0.21
 Nodes (8): Sale, Meta, PaymentStatus, SaleStatus, _next_invoice_number(), create_sale_invoice(), _format_sale(), get_sale()
 
-### Community 74 - "tenants/admin.py"
+### Community 74 - "django_contrib"
 Cohesion: 0.29
 Nodes (3): DayBookAdmin, StockMovementAdmin, StockSummaryAdmin
 
@@ -282,10 +286,6 @@ Nodes (3): generate_pairing_qr_data_url(), get_lan_ip(), start_pairing_session()
 Cohesion: 0.24
 Nodes (6): PaymentInline, SaleAdmin, SaleItemInline, Payment, PaymentMethod, SaleItem
 
-### Community 85 - "App.tsx"
-Cohesion: 0.17
-Nodes (20): App(), FeatureRoute(), ProtectedRoute(), Layout(), AuthContext, AuthContextType, AuthProvider(), useAuth() (+12 more)
-
 ### Community 86 - "qrPayload.ts"
 Cohesion: 0.16
 Nodes (21): CartItem, BulkQRPrintModal(), BulkQRPrintModalProps, TagItemWithQR, ClubTrayModal(), ClubTrayModalProps, SortField, QRTagModal() (+13 more)
@@ -302,29 +302,25 @@ Nodes (8): ShopRateSetting, get_current_rates(), get_customer(), get_live_market
 Cohesion: 0.25
 Nodes (4): InvoiceSetting, PaperSize, TemplateStyle, reset_demo_invoice_settings()
 
-### Community 92 - "tenants/admin.py"
-Cohesion: 0.33
-Nodes (3): ClientAdmin, DomainAdmin, DomainInline
-
-### Community 94 - "index.ts"
+### Community 94 - "lucide-react"
 Cohesion: 0.36
 Nodes (7): CameraCaptureModal(), CameraCaptureModalProps, ProductFormModal(), ProductFormModalProps, Category, Purity, lucide-react
 
-### Community 95 - "UUID"
-Cohesion: 0.15
-Nodes (4): Migration, Migration, Migration, RequestLoggingMiddleware
+### Community 95 - "App.tsx"
+Cohesion: 0.17
+Nodes (20): App(), FeatureRoute(), ProtectedRoute(), Layout(), AuthContext, AuthContextType, AuthProvider(), useAuth() (+12 more)
 
 ### Community 96 - "GoldRate"
 Cohesion: 0.16
 Nodes (5): GoldRate, Meta, fetch_live_market_rates_async(), sync_live_rates_async(), sync_rates_from_source()
 
-### Community 97 - "resolve_and_record_scan"
+### Community 97 - "vite.config.ts"
+Cohesion: 0.25
+Nodes (6): @tailwindcss/vite@^4.3.3, vite@^8.3.4, @vitejs/plugin-react@^6.1.2, @tailwindcss/vite, vite, @vitejs/plugin-react
+
+### Community 98 - "resolve_and_record_scan"
 Cohesion: 0.33
 Nodes (3): ScannedItemAudit, Meta, resolve_and_record_scan()
-
-### Community 98 - "verify_mobile_token"
-Cohesion: 0.33
-Nodes (3): verify_mobile_token(), mobile_scan_fallback(), _execute_scan()
 
 ### Community 99 - "metalRateHelper.ts"
 Cohesion: 0.53
@@ -334,11 +330,15 @@ Nodes (5): clean(), detectProductMetal(), MetalType, ResolvedMetalRate, resolveP
 Cohesion: 0.19
 Nodes (11): @zxing/browser@^0.2.1, @zxing/library@^0.23.0, beep(), isVideoReady(), makeReader(), MobileQRScanner(), startDecodeLoop(), MobileQRScannerProps (+3 more)
 
+### Community 103 - "verify_mobile_token"
+Cohesion: 0.33
+Nodes (3): verify_mobile_token(), mobile_scan_fallback(), _execute_scan()
+
 ### Community 110 - "Purity"
 Cohesion: 0.08
 Nodes (11): Customer, ProductAdmin, Category, Meta, Purity, Meta, TenantBackupService, TenantRestoreService (+3 more)
 
-### Community 111 - "index.ts"
+### Community 111 - "POSScreen.tsx"
 Cohesion: 0.14
 Nodes (28): api, RateSource, InvoiceModal(), InvoiceModalProps, InvoiceSettingsModalProps, PosScannerConnectionModal(), PosScannerConnectionModalProps, POSScreen() (+20 more)
 
@@ -354,15 +354,15 @@ Nodes (8): Client, Meta, ProvisioningStatus, NinjaProductsStockTestCase, Custome
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Branch` connect `User` to `products_router.py`, `NinjaPOSBillingTestCase`, `tenants_router.py`, `InvoiceSettingsTestCase`, `MultiSourceGoldRateScraperTestCase`, `create_token`, `bills_router.py`, `auth_router.py`, `Product`, `NinjaAuthTestCase`, `DayBookAccountingTestCase`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `billing_router.py`, `create_sale`, `Sale`, `DataExportTestCase`, `DeveloperPortalTestCase`, `TrayQRTagsTestCase`, `download_invoice_pdf`, `accounting_router.py`, `ShopRateSetting`, `InvoiceSetting`, `GoldRate`, `test_mobile_scanner.py`, `backup_service.py`, `Purity`, `Client`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `Branch` connect `User` to `products_router.py`, `NinjaPOSBillingTestCase`, `tenants_router.py`, `InvoiceSettingsTestCase`, `backup_service.py`, `bills_router.py`, `auth_router.py`, `Product`, `create_sale`, `create_token`, `DayBookAccountingTestCase`, `MultiSourceGoldRateScraperTestCase`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `billing_router.py`, `NinjaAuthTestCase`, `Sale`, `DataExportTestCase`, `TrayQRTagsTestCase`, `DeveloperPortalTestCase`, `download_invoice_pdf`, `accounting_router.py`, `ShopRateSetting`, `InvoiceSetting`, `GoldRate`, `test_mobile_scanner.py`, `Purity`, `Client`?**
+  _High betweenness centrality (0.050) - this node is a cross-community bridge._
 - **Are the 32 inferred relationships involving `Client` (e.g. with `export_tenant_data_to_zip()` and `generate_all_shops_export_archive()`) actually correct?**
   _`Client` has 32 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `swarna-khata-book` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `products_router.py` be split into smaller, more focused modules?**
   _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
-- **Why does `User` connect `User` to `products_router.py`, `NinjaPOSBillingTestCase`, `tenants_router.py`, `InvoiceSettingsTestCase`, `MultiSourceGoldRateScraperTestCase`, `create_token`, `bills_router.py`, `auth_router.py`, `Product`, `NinjaAuthTestCase`, `DayBookAccountingTestCase`, `logging`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `export_tenant_data_to_zip`, `create_sale`, `DataExportTestCase`, `DeveloperPortalTestCase`, `TrayQRTagsTestCase`, `TenantProvisioningService`, `JWTAuth`, `test_mobile_scanner.py`, `backup_service.py`, `Purity`, `Client`?**
+- **Why does `User` connect `User` to `products_router.py`, `NinjaPOSBillingTestCase`, `tenants_router.py`, `InvoiceSettingsTestCase`, `backup_service.py`, `bills_router.py`, `auth_router.py`, `Product`, `create_sale`, `create_token`, `DayBookAccountingTestCase`, `MultiSourceGoldRateScraperTestCase`, `logging`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `export_tenant_data_to_zip`, `NinjaAuthTestCase`, `DataExportTestCase`, `TrayQRTagsTestCase`, `DeveloperPortalTestCase`, `.provision_store`, `JWTAuth`, `test_mobile_scanner.py`, `Purity`, `Client`?**
   _High betweenness centrality (0.038) - this node is a cross-community bridge._
 - **Are the 35 inferred relationships involving `User` (e.g. with `TenantBackupService` and `export_tenant_data_to_zip()`) actually correct?**
   _`User` has 35 INFERRED edges - model-reasoned connections that need verification._

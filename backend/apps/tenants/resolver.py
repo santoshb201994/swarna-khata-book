@@ -199,6 +199,13 @@ class TenantResolver:
         # Step 3: Handle Unauthenticated Request (Registration, Login, Public Catalog)
         tenant = None
 
+        # 3.0 Platform exempt paths (e.g. /api/tenants/*, /api/health) must always route to public schema
+        if cls.is_exempt_path(request.path):
+            tenant = tenant_model.objects.filter(schema_name=public_schema).first()
+            if not tenant:
+                raise TenantResolutionError("Public platform tenant not found.", status_code=500)
+            return tenant, None
+
         # 3a. Use advisory hint if safe and valid
         if hint_schema and hint_schema != public_schema:
             hint_clean = cls.sanitize_schema_name(hint_schema)

@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/auth/Login.tsx": {
-    "mtime": 1793512494.4076557,
-    "seen": 1793512502.1508367,
-    "ast_hash": "83b5e83458d1627228465ad800127bf6",
+    "mtime": 1793562936.8186638,
+    "seen": 1793562944.9601576,
+    "ast_hash": "aa9a1fce008a2d0b2161b2fec1f92471",
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
-    "mtime": 1793550678.8090258,
-    "seen": 1793550686.968883,
-    "ast_hash": "9e17fbc8cd069569eadf7fa472a3fdea",
+    "mtime": 1793562920.6664104,
+    "seen": 1793562928.0092182,
+    "ast_hash": "03e3c652cc8cbd5f99a8886dd0faedab",
     "semantic_hash": ""
   },
   "backend/ninja_api/api.py": {
@@ -1146,15 +1146,15 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/resolver.py": {
-    "mtime": 1793550573.6543756,
-    "seen": 1793550581.6175013,
-    "ast_hash": "0b4ad8367f4345cb424f6070ecc21063",
+    "mtime": 1793562897.3941004,
+    "seen": 1793562905.3051555,
+    "ast_hash": "a65448cc5f697f93b2ce9d3d69dbcc5a",
     "semantic_hash": ""
   },
   "backend/apps/tenants/provisioning.py": {
-    "mtime": 1793550646.9797983,
-    "seen": 1793550654.934096,
-    "ast_hash": "7d082d06a74d19cfe05bedf28578c16a",
+    "mtime": 1793562909.8815002,
+    "seen": 1793562918.1614337,
+    "ast_hash": "14461001f297c1ed2f2d6b6adf30a7ff",
     "semantic_hash": ""
   },
   "backend/apps/tenants/migrator.py": {

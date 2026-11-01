@@ -92,7 +92,7 @@ class TenantProvisioningService:
                 name=shop_name.strip(),
                 description=f"Jewellery retail showroom for {shop_name.strip()}",
                 is_active=False, # Remains inactive until verified
-                provisioning_status=Client.ProvisioningStatus.INITIALIZING,
+                provisioning_status=Client.ProvisioningStatus.PROVISIONING,
                 idempotency_key=idempotency_key
             )
             # auto_create_schema=True ensures django-tenants handles CREATE SCHEMA & migrate_schemas
@@ -107,13 +107,7 @@ class TenantProvisioningService:
 
         # 3. Step 2 & 3: Provision and Seed within tenant schema
         try:
-            tenant.provisioning_status = Client.ProvisioningStatus.PROVISIONING
-            tenant.save(update_fields=['provisioning_status'])
-
             with schema_context(schema_name):
-                tenant.provisioning_status = Client.ProvisioningStatus.SEEDING
-                tenant.save(update_fields=['provisioning_status'])
-
                 # A. Showroom Branch
                 main_branch = Branch.objects.create(
                     name="Main Showroom",

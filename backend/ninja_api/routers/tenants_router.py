@@ -37,7 +37,7 @@ def register_store(request, payload: StoreRegistrationIn):
 
     # Extract optional Idempotency-Key header if provided by client HTTP headers
     header_idempotency = request.headers.get('Idempotency-Key') or request.META.get('HTTP_IDEMPOTENCY_KEY')
-    effective_idempotency_key = payload.idempotency_key or header_idempotency
+    effective_idempotency_key = (payload.idempotency_key or header_idempotency or "").strip() or None
 
     try:
         result = TenantProvisioningService.provision_store(

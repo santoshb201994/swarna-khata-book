@@ -77,15 +77,28 @@ export const Login: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const res = await api.post('/tenants/register-store/', {
-        shop_name: regShopName.trim(),
-        owner_username: regUsername.trim(),
-        owner_password: regPassword,
-        owner_email: regEmail.trim(),
-        owner_phone: regPhone.trim(),
-        address: regAddress.trim(),
-        gstin: regGstin.trim(),
-      });
+
+      // Ensure no stale session or tenant context interferes with onboarding
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('tenant_schema');
+      localStorage.removeItem('user_info');
+
+      const res = await api.post(
+        '/tenants/register-store/',
+        {
+          shop_name: regShopName.trim(),
+          owner_username: regUsername.trim(),
+          owner_password: regPassword,
+          owner_email: regEmail.trim(),
+          owner_phone: regPhone.trim(),
+          address: regAddress.trim(),
+          gstin: regGstin.trim(),
+        },
+        {
+          timeout: 240000, // 4-minute timeout for multi-tenant schema creation & migrations on remote DB
+        }
+      );
 
       const { access, refresh, schema_name } = res.data;
       localStorage.setItem('access_token', access);
@@ -107,13 +120,21 @@ export const Login: React.FC = () => {
       toast.success(`Store '${regShopName}' provisioned successfully!`);
       window.location.href = '/';
     } catch (err: any) {
-      const msg =
-        err.response?.data?.error ||
-        err.response?.data?.detail ||
-        (err.code === 'ECONNABORTED' || err.message?.includes('timeout')
-          ? 'Backend server took too long to respond. The Render free tier instance may be waking up from sleep. Please wait 30 seconds and try again.'
-          : err.message || 'Failed to register new store');
-      toast.error(msg, { duration: 6000 });
+      let msg = 'Failed to register new store';
+      if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          msg = err.response.data.detail.map((d: any) => d.msg || d.message).join(', ');
+        } else if (typeof err.response.data.detail === 'string') {
+          msg = err.response.data.detail;
+        }
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        msg = 'Database schema provisioning is taking longer than expected. Please wait a moment and try logging in, or try again.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      toast.error(msg, { duration: 8000 });
     } finally {
       setIsSubmitting(false);
     }
