@@ -282,10 +282,10 @@
     "semantic_hash": ""
   },
   "backend/config/views.py": {
-    "mtime": 1792772435.9835508,
-    "seen": 1792777341.4970007,
-    "ast_hash": "c8959e8102a2cffc4ee78c701f0df4fb",
-    "semantic_hash": "c8959e8102a2cffc4ee78c701f0df4fb"
+    "mtime": 1793515693.4847703,
+    "seen": 1793515701.4001868,
+    "ast_hash": "2f787970f134b42218e9e81db8c9a7eb",
+    "semantic_hash": ""
   },
   "backend/config/wsgi.py": {
     "mtime": 1792734678.8053577,
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "frontend/src/api/client.ts": {
-    "mtime": 1793498893.3079195,
-    "seen": 1793498895.1838772,
-    "ast_hash": "38fee8c0bacf030ff44590639ac4e6bc",
+    "mtime": 1793512440.121521,
+    "seen": 1793512447.1490111,
+    "ast_hash": "71ff093aaa34c9055a2e16284197b231",
     "semantic_hash": ""
   },
   "frontend/src/components/Layout.tsx": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/auth/Login.tsx": {
-    "mtime": 1793198174.3514235,
-    "seen": 1793198181.2411652,
-    "ast_hash": "50d0d07a037f892e8e1737161850ed11",
+    "mtime": 1793512494.4076557,
+    "seen": 1793512502.1508367,
+    "ast_hash": "83b5e83458d1627228465ad800127bf6",
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
@@ -1080,9 +1080,9 @@
     "semantic_hash": ""
   },
   "render.yaml": {
-    "mtime": 1793505499.3284473,
-    "seen": 1793505506.6455052,
-    "ast_hash": "798aa0b47fb30f820bd252a49834873d",
+    "mtime": 1793512429.2691984,
+    "seen": 1793512437.1268277,
+    "ast_hash": "6f5b7c32ec8dfbcc6dd206346b96ea94",
     "semantic_hash": ""
   },
   "frontend/src/utils/backendUrl.ts": {
