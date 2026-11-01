@@ -21,6 +21,7 @@ import { InvoiceModal } from './InvoiceModal';
 import { CustomerSelectOrAdd } from '../customers/CustomerSelectOrAdd';
 import { downloadInvoicePdf } from '../../utils/invoiceDownload';
 import { resolveProductRate } from './metalRateHelper';
+import { getWsBaseUrl } from '../../utils/backendUrl';
 
 interface CartItem {
   product: Product;
@@ -119,9 +120,8 @@ export const POSScreen: React.FC = () => {
       let token = localStorage.getItem('access_token');
       if (!token) return;
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/pos/?session_id=${encodeURIComponent(
+      const wsBase = getWsBaseUrl();
+      const wsUrl = `${wsBase}/pos/?session_id=${encodeURIComponent(
         activeSessionId
       )}&token=${encodeURIComponent(token)}`;
 

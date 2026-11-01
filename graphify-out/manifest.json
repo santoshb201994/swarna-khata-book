@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "backend/config/settings.py": {
-    "mtime": 1793431772.6198869,
-    "seen": 1793431779.738598,
-    "ast_hash": "ef7fee71fbe5cc89a0228613b903a5f7",
+    "mtime": 1793498867.336904,
+    "seen": 1793498874.3895042,
+    "ast_hash": "f160089793eeb43c6394a144e13bd7c4",
     "semantic_hash": ""
   },
   "backend/config/urls.py": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "frontend/src/api/client.ts": {
-    "mtime": 1793130219.2729511,
-    "seen": 1793130226.852976,
-    "ast_hash": "9534de6d446805f0c47bc019d9b6b5f3",
+    "mtime": 1793498893.3079195,
+    "seen": 1793498895.1838772,
+    "ast_hash": "38fee8c0bacf030ff44590639ac4e6bc",
     "semantic_hash": ""
   },
   "frontend/src/components/Layout.tsx": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
-    "mtime": 1793420007.3977726,
-    "seen": 1793420015.9378083,
-    "ast_hash": "aa9448dfb39b2c87de7d90470966297f",
+    "mtime": 1793498912.5092733,
+    "seen": 1793498915.4225354,
+    "ast_hash": "0f36224ba5faa7b23df2fbdbd0755c54",
     "semantic_hash": ""
   },
   "frontend/src/features/camera/CameraCaptureModal.tsx": {
@@ -552,9 +552,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/scanner/MobileScannerPage.tsx": {
-    "mtime": 1792921263.5692852,
-    "seen": 1792921266.827112,
-    "ast_hash": "8436d588e0e5731361d618a31c22d90e",
+    "mtime": 1793498957.4266808,
+    "seen": 1793498964.5687525,
+    "ast_hash": "76d26d50ab76634b94cb829d5380d1a8",
     "semantic_hash": ""
   },
   "backend/apps/tenants/__init__.py": {
@@ -1080,9 +1080,21 @@
     "semantic_hash": ""
   },
   "render.yaml": {
-    "mtime": 1793433285.1388102,
-    "seen": 1793433306.009928,
-    "ast_hash": "98d528141d225c1c3d900d834ffdecab",
+    "mtime": 1793498999.2634516,
+    "seen": 1793499007.9136992,
+    "ast_hash": "54fffeadfdb77b8b51137822bf295a97",
+    "semantic_hash": ""
+  },
+  "frontend/src/utils/backendUrl.ts": {
+    "mtime": 1793498882.741319,
+    "seen": 1793498890.6682408,
+    "ast_hash": "1c23cbd0715d2cb91be424a5c751bd87",
+    "semantic_hash": ""
+  },
+  "frontend/vercel.json": {
+    "mtime": 1793498971.3330379,
+    "seen": 1793498980.0175912,
+    "ast_hash": "cf6fad1ce721da13630f9f3e7b81fd0c",
     "semantic_hash": ""
   }
 }

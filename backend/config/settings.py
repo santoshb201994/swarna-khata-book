@@ -19,7 +19,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 # Production guardrail: In production (DEBUG=False), ALLOWED_HOSTS must be explicit
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,testserver,.localhost',
+    default='localhost,127.0.0.1,testserver,.localhost,.onrender.com',
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 if DEBUG:
@@ -30,6 +30,8 @@ DEFAULT_CSRF_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://localhost:5173',
+    'https://*.onrender.com',
+    'https://*.vercel.app',
 ]
 if DEBUG:
     DEFAULT_CSRF_ORIGINS.append('https://*.trycloudflare.com')
@@ -190,6 +192,9 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.vercel\.app$",
+]
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 

@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { logger } from '../utils/logger'
+import { getApiBaseUrl } from '../utils/backendUrl'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -49,7 +50,10 @@ api.interceptors.response.use(
               try {
                 const currentTenant = localStorage.getItem('tenant_schema') || 'demo'
                 logger.info('auth', `Attempting access token refresh [Tenant: ${currentTenant}]`)
-                const { data } = await axios.post('/api/auth/token/refresh/', { refresh }, {
+                const refreshEndpoint = getApiBaseUrl().endsWith('/api')
+                  ? `${getApiBaseUrl()}/auth/token/refresh/`
+                  : `${getApiBaseUrl()}/api/auth/token/refresh/`
+                const { data } = await axios.post(refreshEndpoint, { refresh }, {
                   headers: { 'X-Tenant': currentTenant }
                 })
                 localStorage.setItem('access_token', data.access)

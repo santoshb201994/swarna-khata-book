@@ -3,6 +3,7 @@ services:
     name: swarna-khata-book
     runtime: python
     buildCommand: ./render-build.sh
+    preDeployCommand: uv run --directory backend python manage.py migrate_schemas --noinput
     startCommand: uv run uvicorn config.asgi:application --app-dir backend --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health/
     envVars:

@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import axios from 'axios';
+import { getApiBaseUrl, getWsBaseUrl } from '../../utils/backendUrl';
 
 interface ScannedHistoryItem {
   id: string;
@@ -99,7 +100,7 @@ export const MobileScannerPage: React.FC = () => {
         setIsRedeeming(true);
         setPairingError(null);
 
-        const res = await axios.post('/api/pos/pairing/redeem/', {
+        const res = await axios.post(`${getApiBaseUrl()}/pos/pairing/redeem/`, {
           session_id: sessionId,
           pairing_code: pairingCode,
           device_info: `${navigator.userAgent.slice(0, 80)}`,
@@ -157,9 +158,8 @@ export const MobileScannerPage: React.FC = () => {
       wsRef.current = null;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/mobile/?session_id=${encodeURIComponent(
+    const wsBase = getWsBaseUrl();
+    const wsUrl = `${wsBase}/mobile/?session_id=${encodeURIComponent(
       sessionId
     )}&token=${encodeURIComponent(mobileToken)}&tenant=${encodeURIComponent(
       tenantSchema || ''
@@ -289,7 +289,7 @@ export const MobileScannerPage: React.FC = () => {
       // Robust HTTP fallback
       try {
         const res = await axios.post(
-          '/api/pos/pairing/scan/',
+          `${getApiBaseUrl()}/pos/pairing/scan/`,
           {
             event_id: eventId,
             qr_payload: cleanPayload,
