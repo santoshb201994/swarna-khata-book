@@ -244,6 +244,7 @@ export const QRTagModal: React.FC<QRTagModalProps> = ({ isOpen, onClose, product
                     src={qrDataUrl}
                     alt={`QR for ${product.sku}`}
                     className="w-36 h-36 object-contain"
+                    onError={() => setQrDataUrl('')}
                   />
                 ) : (
                   <div className="w-36 h-36 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400">

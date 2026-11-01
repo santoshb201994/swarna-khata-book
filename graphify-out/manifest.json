@@ -276,9 +276,9 @@
     "semantic_hash": ""
   },
   "backend/config/urls.py": {
-    "mtime": 1792836425.4920003,
-    "seen": 1792836431.491369,
-    "ast_hash": "5e1275ac5b097af8a2619ee6b9ed8e8f",
+    "mtime": 1793543718.9358008,
+    "seen": 1793543726.864761,
+    "ast_hash": "ccfc59e79d02d28f132f042c0682b6a5",
     "semantic_hash": ""
   },
   "backend/config/views.py": {
@@ -378,15 +378,15 @@
     "semantic_hash": ""
   },
   "frontend/src/features/products/ProductList.tsx": {
-    "mtime": 1793541537.3451693,
-    "seen": 1793541545.5991995,
-    "ast_hash": "e8723fee84cbf01ea32eaacf402ab554",
+    "mtime": 1793543816.433396,
+    "seen": 1793543824.4308429,
+    "ast_hash": "ea300ea3ddcaad8e2711ffcc46ca8563",
     "semantic_hash": ""
   },
   "frontend/src/features/products/QRTagModal.tsx": {
-    "mtime": 1793541541.8205116,
-    "seen": 1793541545.5991995,
-    "ast_hash": "eb6c4f18e19679c68c6e256996c087bb",
+    "mtime": 1793543832.4399328,
+    "seen": 1793543839.8492548,
+    "ast_hash": "7c98580dcdb54fbae04d13cbadc22cc1",
     "semantic_hash": ""
   },
   "frontend/src/main.tsx": {
@@ -1056,9 +1056,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/products/TrayQRTagModal.tsx": {
-    "mtime": 1793420020.117153,
-    "seen": 1793420023.4443712,
-    "ast_hash": "0d5559e43019f1be3acdf04eaeaef208",
+    "mtime": 1793543844.8408978,
+    "seen": 1793543851.9860215,
+    "ast_hash": "fdde160b4c334537d12e07aa5ee4bbf3",
     "semantic_hash": ""
   },
   "frontend/e2e/tray_group_qr.spec.ts": {
@@ -1122,9 +1122,9 @@
     "semantic_hash": ""
   },
   "frontend/src/utils/qrPayload.ts": {
-    "mtime": 1793541073.149404,
-    "seen": 1793541081.358966,
-    "ast_hash": "ac8c85fbcc5783a49f70b6c94e10282a",
+    "mtime": 1793543733.9359856,
+    "seen": 1793543741.838594,
+    "ast_hash": "7d07640cea1c639cf3fc552aa3706f57",
     "semantic_hash": ""
   },
   "frontend/src/features/products/BulkQRPrintModal.tsx": {

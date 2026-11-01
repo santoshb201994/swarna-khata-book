@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { X, Printer, Download, Copy, Check, Layers } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { X, Printer, Download, Copy, Check, Layers, RefreshCw } from 'lucide-react';
 import type { Tray } from '../../types';
 import api from '../../api/client';
 import toast from 'react-hot-toast';
+import { generateQRDataUrl } from '../../utils/qrPayload';
 
 interface TrayQRTagModalProps {
   isOpen: boolean;
@@ -19,6 +20,32 @@ export const TrayQRTagModal: React.FC<TrayQRTagModalProps> = ({
 }) => {
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isSubscribed = true;
+    if (isOpen && tray) {
+      setIsGenerating(true);
+      const payload = tray.qr_data || tray.code;
+      generateQRDataUrl(payload, { width: 300, margin: 1 })
+        .then((url) => {
+          if (isSubscribed) {
+            setQrDataUrl(url);
+            setIsGenerating(false);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to generate tray QR:', err);
+          if (isSubscribed) {
+            setIsGenerating(false);
+          }
+        });
+    }
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isOpen, tray]);
 
   if (!isOpen || !tray) return null;
 
@@ -93,15 +120,20 @@ export const TrayQRTagModal: React.FC<TrayQRTagModalProps> = ({
               {/* QR Image */}
               <div className="flex flex-col items-center justify-center">
                 <div className="p-3 bg-white rounded-xl border border-amber-200 shadow-sm">
-                  {tray.qr_image_url ? (
+                  {isGenerating ? (
+                    <div className="w-44 h-44 flex items-center justify-center text-xs text-slate-400">
+                      <RefreshCw className="w-6 h-6 animate-spin text-amber-600" />
+                    </div>
+                  ) : qrDataUrl ? (
                     <img
-                      src={tray.qr_image_url}
+                      src={qrDataUrl}
                       alt={`Group QR for ${tray.code}`}
                       className="w-44 h-44 object-contain"
+                      onError={() => setQrDataUrl('')}
                     />
                   ) : (
                     <div className="w-44 h-44 bg-slate-100 rounded flex items-center justify-center text-xs text-slate-400">
-                      Generating QR...
+                      No QR Generated
                     </div>
                   )}
                 </div>
@@ -261,12 +293,10 @@ export const TrayQRTagModal: React.FC<TrayQRTagModalProps> = ({
               <span>{copied ? 'Copied' : 'Copy QR Data'}</span>
             </button>
 
-            {tray.qr_image_url && (
+            {qrDataUrl && (
               <a
-                href={tray.qr_image_url}
+                href={qrDataUrl}
                 download={`group_qr_${tray.code}.png`}
-                target="_blank"
-                rel="noreferrer"
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition"
                 title="Download QR image PNG"
               >

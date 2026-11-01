@@ -150,7 +150,9 @@ export async function generateQRDataUrl(
   options?: QRCode.QRCodeToDataURLOptions
 ): Promise<string> {
   const token = (qrTokenOrSku || '').trim();
-  const payload = UUID_V4_REGEX.test(token) ? getQRPayload(token) : token;
+  const payload = UUID_V4_REGEX.test(token)
+    ? getQRPayload(token)
+    : (token || 'SKB:UNKNOWN');
 
   const defaultOptions: QRCode.QRCodeToDataURLOptions = {
     errorCorrectionLevel: 'M',
@@ -175,7 +177,9 @@ export async function generateQRSvg(
   options?: QRCode.QRCodeToStringOptions
 ): Promise<string> {
   const token = (qrTokenOrSku || '').trim();
-  const payload = UUID_V4_REGEX.test(token) ? getQRPayload(token) : token;
+  const payload = UUID_V4_REGEX.test(token)
+    ? getQRPayload(token)
+    : (token || 'SKB:UNKNOWN');
 
   const defaultOptions: QRCode.QRCodeToStringOptions = {
     type: 'svg',

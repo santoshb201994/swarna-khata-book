@@ -392,11 +392,14 @@ export const ProductList: React.FC = () => {
   };
 
   const handleOpenQRTag = async (prod: Product) => {
+    setSelectedProductForQR(prod);
     try {
       const res = await api.get(`/products/${prod.id}/`);
-      setSelectedProductForQR(res.data);
+      if (res.data) {
+        setSelectedProductForQR(res.data);
+      }
     } catch {
-      setSelectedProductForQR(prod);
+      // keep initial prod state
     }
   };
 
@@ -1191,19 +1194,14 @@ export const ProductList: React.FC = () => {
                       </div>
 
                       {/* Small QR Thumbnail preview */}
-                      {tray.qr_image_url && (
-                        <button
-                          onClick={() => handleOpenTrayQR(tray)}
-                          className="p-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-amber-50 hover:border-amber-300 transition shrink-0"
-                          title="Click to view Group QR Tag"
-                        >
-                          <img
-                            src={tray.qr_image_url}
-                            alt={tray.code}
-                            className="w-12 h-12 object-contain"
-                          />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTrayQR(tray)}
+                        className="p-2 bg-amber-50/80 border border-amber-200 rounded-xl hover:bg-amber-100 hover:border-amber-400 transition shrink-0 flex items-center justify-center text-amber-700 shadow-2xs"
+                        title="Click to view Group QR Tag"
+                      >
+                        <QrCode className="w-7 h-7" />
+                      </button>
                     </div>
 
                     {/* Stats Grid */}
