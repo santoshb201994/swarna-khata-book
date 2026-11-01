@@ -86,11 +86,6 @@ export const ProductList: React.FC = () => {
   const [editingTray, setEditingTray] = useState<Tray | null>(null);
   const [selectedTrayForQR, setSelectedTrayForQR] = useState<Tray | null>(null);
 
-  useEffect(() => {
-    fetchInitialData();
-    fetchTrays();
-  }, []);
-
   const fetchInitialData = async () => {
     try {
       setIsLoading(true);
@@ -120,6 +115,11 @@ export const ProductList: React.FC = () => {
       setIsLoadingTrays(false);
     }
   };
+
+  useEffect(() => {
+    fetchInitialData();
+    fetchTrays();
+  }, []);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -1300,36 +1300,44 @@ export const ProductList: React.FC = () => {
       />
 
       {/* Individual Product QR Tag Modal */}
-      <QRTagModal
-        isOpen={!!selectedProductForQR}
-        onClose={() => setSelectedProductForQR(null)}
-        product={selectedProductForQR}
-      />
+      {selectedProductForQR && (
+        <QRTagModal
+          isOpen={!!selectedProductForQR}
+          onClose={() => setSelectedProductForQR(null)}
+          product={selectedProductForQR}
+        />
+      )}
 
       {/* Bulk QR Print Modal for Selected Items */}
-      <BulkQRPrintModal
-        isOpen={isBulkPrintModalOpen}
-        onClose={() => setIsBulkPrintModalOpen(false)}
-        products={selectedProductsList}
-      />
+      {isBulkPrintModalOpen && (
+        <BulkQRPrintModal
+          isOpen={isBulkPrintModalOpen}
+          onClose={() => setIsBulkPrintModalOpen(false)}
+          products={selectedProductsList}
+        />
+      )}
 
       {/* Club Products into Tray Modal */}
-      <ClubTrayModal
-        isOpen={isClubTrayModalOpen}
-        onClose={() => setIsClubTrayModalOpen(false)}
-        selectedProducts={selectedProductsList}
-        allProducts={products}
-        editingTray={editingTray}
-        onTraySaved={handleTraySaved}
-      />
+      {isClubTrayModalOpen && (
+        <ClubTrayModal
+          isOpen={isClubTrayModalOpen}
+          onClose={() => setIsClubTrayModalOpen(false)}
+          selectedProducts={selectedProductsList}
+          allProducts={products}
+          editingTray={editingTray}
+          onTraySaved={handleTraySaved}
+        />
+      )}
 
       {/* Tray Group QR Tag Modal (Print & Full Details of All Items) */}
-      <TrayQRTagModal
-        isOpen={!!selectedTrayForQR}
-        onClose={() => setSelectedTrayForQR(null)}
-        tray={selectedTrayForQR}
-        onRefresh={fetchTrays}
-      />
+      {selectedTrayForQR && (
+        <TrayQRTagModal
+          isOpen={!!selectedTrayForQR}
+          onClose={() => setSelectedTrayForQR(null)}
+          tray={selectedTrayForQR}
+          onRefresh={fetchTrays}
+        />
+      )}
     </div>
   );
 };

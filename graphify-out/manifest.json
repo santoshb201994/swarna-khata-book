@@ -378,15 +378,15 @@
     "semantic_hash": ""
   },
   "frontend/src/features/products/ProductList.tsx": {
-    "mtime": 1793543816.433396,
-    "seen": 1793543824.4308429,
-    "ast_hash": "ea300ea3ddcaad8e2711ffcc46ca8563",
+    "mtime": 1793545012.1001277,
+    "seen": 1793545019.860527,
+    "ast_hash": "3dda460a3352810b6b64e5cff698ec6a",
     "semantic_hash": ""
   },
   "frontend/src/features/products/QRTagModal.tsx": {
-    "mtime": 1793543832.4399328,
-    "seen": 1793543839.8492548,
-    "ast_hash": "7c98580dcdb54fbae04d13cbadc22cc1",
+    "mtime": 1793544865.3828466,
+    "seen": 1793544873.2503862,
+    "ast_hash": "551b7d4b9bf02317a542f3e22aeec499",
     "semantic_hash": ""
   },
   "frontend/src/main.tsx": {

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { X, Printer, Download, CheckCircle2, ShieldCheck, AlertCircle, Camera, RefreshCw, Copy, Check } from 'lucide-react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import type { Product } from '../../types';
@@ -34,6 +34,97 @@ export const QRTagModal: React.FC<QRTagModalProps> = ({ isOpen, onClose, product
 
   const canonicalPayload = product ? getQRPayload(product.qr_token || product.sku) : '';
 
+  // 1. Declare stopCameraScanner first
+  const stopCameraScanner = useCallback(() => {
+    if (controlsRef.current) {
+      try {
+        controlsRef.current.stop();
+      } catch {
+        // ignore
+      }
+      controlsRef.current = null;
+    }
+    setIsCameraActive(false);
+  }, []);
+
+  // 2. Declare verifyPayload
+  const verifyPayload = useCallback(async (scannedPayload: string) => {
+    if (!product) return;
+    setIsVerifying(true);
+
+    const localVal = validateQRPayload(scannedPayload, product.qr_token, product.sku);
+
+    try {
+      const tokenToQuery = product.qr_token || product.sku;
+      const res = await api.post(`/pos/items/${tokenToQuery}/verify-tag/`, {
+        scanned_payload: scannedPayload.trim(),
+      });
+
+      if (res.data.match) {
+        setVerificationResult({
+          status: 'success',
+          message: 'Verified Physical Tag! Tag matches this jewellery item and is ready for inventory.',
+          printedCount: res.data.printed_count,
+        });
+        toast.success('Physical Tag Verified Successfully!');
+      } else {
+        setVerificationResult({
+          status: 'error',
+          message: res.data.message || 'Scanned tag payload does not match this item.',
+        });
+        toast.error('Tag Mismatch!');
+      }
+    } catch {
+      if (localVal.match) {
+        setVerificationResult({
+          status: 'success',
+          message: localVal.message,
+        });
+        toast.success('Verified locally against item identity!');
+      } else {
+        setVerificationResult({
+          status: 'error',
+          message: localVal.message,
+        });
+        toast.error('Tag Mismatch!');
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [product]);
+
+  // 3. Declare startCameraScanner
+  const startCameraScanner = useCallback(async () => {
+    setIsCameraActive(true);
+    setVerificationResult({ status: 'idle', message: '' });
+
+    try {
+      const codeReader = new BrowserQRCodeReader();
+      const videoElement = videoRef.current;
+      if (!videoElement) return;
+
+      const controls = await codeReader.decodeFromVideoDevice(
+        undefined,
+        videoElement,
+        (result, error) => {
+          if (result) {
+            const scannedText = result.getText();
+            stopCameraScanner();
+            verifyPayload(scannedText);
+          }
+          if (error && !(error.name === 'NotFoundException')) {
+            // normal frame scan miss
+          }
+        }
+      );
+      controlsRef.current = controls;
+    } catch (err: any) {
+      console.warn('Camera verification scanner failed to start:', err);
+      toast.error('Could not access camera for tag verification.');
+      setIsCameraActive(false);
+    }
+  }, [stopCameraScanner, verifyPayload]);
+
   // Generate QR dynamically whenever product changes
   useEffect(() => {
     let isSubscribed = true;
@@ -64,9 +155,10 @@ export const QRTagModal: React.FC<QRTagModalProps> = ({ isOpen, onClose, product
     if (!isOpen || activeTab !== 'verify') {
       stopCameraScanner();
     }
-  }, [isOpen, activeTab]);
-
-  if (!isOpen || !product) return null;
+    return () => {
+      stopCameraScanner();
+    };
+  }, [isOpen, activeTab, stopCameraScanner]);
 
   const handlePrint = () => {
     window.print();
@@ -80,95 +172,7 @@ export const QRTagModal: React.FC<QRTagModalProps> = ({ isOpen, onClose, product
     setTimeout(() => setCopiedPayload(false), 2000);
   };
 
-  const startCameraScanner = async () => {
-    setIsCameraActive(true);
-    setVerificationResult({ status: 'idle', message: '' });
-
-    try {
-      const codeReader = new BrowserQRCodeReader();
-      const videoElement = videoRef.current;
-      if (!videoElement) return;
-
-      const controls = await codeReader.decodeFromVideoDevice(
-        undefined,
-        videoElement,
-        (result, error) => {
-          if (result) {
-            const scannedText = result.getText();
-            stopCameraScanner();
-            verifyPayload(scannedText);
-          }
-          if (error && !(error.name === 'NotFoundException')) {
-            // normal frame scan miss
-          }
-        }
-      );
-      controlsRef.current = controls;
-    } catch (err: any) {
-      console.warn('Camera verification scanner failed to start:', err);
-      toast.error('Could not access camera for tag verification.');
-      setIsCameraActive(false);
-    }
-  };
-
-  const stopCameraScanner = () => {
-    if (controlsRef.current) {
-      try {
-        controlsRef.current.stop();
-      } catch {
-        // ignore
-      }
-      controlsRef.current = null;
-    }
-    setIsCameraActive(false);
-  };
-
-  const verifyPayload = async (scannedPayload: string) => {
-    if (!product) return;
-    setIsVerifying(true);
-
-    // 1. Local validation check
-    const localVal = validateQRPayload(scannedPayload, product.qr_token, product.sku);
-
-    try {
-      const tokenToQuery = product.qr_token || product.sku;
-      const res = await api.post(`/pos/items/${tokenToQuery}/verify-tag/`, {
-        scanned_payload: scannedPayload.trim(),
-      });
-
-      if (res.data.match) {
-        setVerificationResult({
-          status: 'success',
-          message: 'Verified Physical Tag! Tag matches this jewellery item and is ready for inventory.',
-          printedCount: res.data.printed_count,
-        });
-        toast.success('Physical Tag Verified Successfully!');
-      } else {
-        setVerificationResult({
-          status: 'error',
-          message: res.data.message || 'Scanned tag payload does not match this item.',
-        });
-        toast.error('Tag Mismatch!');
-      }
-    } catch {
-      // Fallback to client-side validation if offline or endpoint error
-      if (localVal.match) {
-        setVerificationResult({
-          status: 'success',
-          message: localVal.message,
-        });
-        toast.success('Verified locally against item identity!');
-      } else {
-        setVerificationResult({
-          status: 'error',
-          message: localVal.message,
-        });
-        toast.error('Tag Mismatch!');
-      }
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+  if (!isOpen || !product) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
