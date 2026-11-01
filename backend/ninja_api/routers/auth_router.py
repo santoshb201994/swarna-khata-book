@@ -106,17 +106,23 @@ def refresh_token(request, payload: TokenRefreshRequest):
     from django_tenants.utils import schema_context, get_tenant_model
     from django.db import connection
 
-    if is_super:
-        with schema_context('public'):
-            user = User.objects.filter(id=claims['user_id'], is_active=True).first()
-    elif token_schema and token_schema != 'public':
+    if token_schema and token_schema != 'public':
         tenant = get_tenant_model().objects.filter(schema_name=token_schema).first()
         if not tenant:
             return 401, {"error": "Tenant database schema does not exist."}
         connection.set_tenant(tenant)
         user = User.objects.filter(id=claims['user_id'], is_active=True).first()
+        if user:
+            user.tenant_schema = token_schema
+    elif is_super or token_schema == 'public':
+        with schema_context('public'):
+            user = User.objects.filter(id=claims['user_id'], is_active=True).first()
+            if user:
+                user.tenant_schema = 'public'
     else:
         user = User.objects.filter(id=claims['user_id'], is_active=True).first()
+        if user:
+            user.tenant_schema = getattr(connection, 'schema_name', 'public')
 
     if not user:
         return 401, {"error": "User no longer exists or is deactivated."}
@@ -125,7 +131,7 @@ def refresh_token(request, payload: TokenRefreshRequest):
     return 200, {
         "access": new_access,
         "refresh": payload.refresh,
-        "tenant_schema": token_schema or getattr(connection, 'schema_name', 'public'),
+        "tenant_schema": getattr(user, 'tenant_schema', None) or token_schema or getattr(connection, 'schema_name', 'public'),
     }
 
 

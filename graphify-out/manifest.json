@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "frontend/src/context/AuthContext.tsx": {
-    "mtime": 1792921122.8577526,
-    "seen": 1792921130.5820286,
-    "ast_hash": "0b30872a6ec97922d2af8d8213af1ad6",
+    "mtime": 1793530342.0542095,
+    "seen": 1793530349.6733778,
+    "ast_hash": "1b9b56fbcab6018659b2985db1240fd0",
     "semantic_hash": ""
   },
   "frontend/src/features/accounting/AccountingDashboard.tsx": {
@@ -624,15 +624,15 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/auth_router.py": {
-    "mtime": 1793130041.1764433,
-    "seen": 1793130041.9847276,
-    "ast_hash": "6a12a43723d0355078a3d591e1ca024c",
+    "mtime": 1793530179.0701144,
+    "seen": 1793530187.1907444,
+    "ast_hash": "f22b0c4fb4b4f12d1408aebf7cbbde49",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
-    "mtime": 1793198719.9777749,
-    "seen": 1793198722.1826746,
-    "ast_hash": "26116021723fe6eec5cd20463122e161",
+    "mtime": 1793530189.7412968,
+    "seen": 1793530197.2879837,
+    "ast_hash": "afd690e89b8f18782ff63c881d69d913",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/stock_router.py": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/qr_tags_router.py": {
-    "mtime": 1793419478.3475099,
-    "seen": 1793419486.3563192,
-    "ast_hash": "435b967a248abfbfb3b3055efeff0da8",
+    "mtime": 1793530199.837044,
+    "seen": 1793530207.417308,
+    "ast_hash": "9242bc00296a6f8124ecb3f86ed4bb66",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/pos_pairing_router.py": {

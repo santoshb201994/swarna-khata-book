@@ -1,7 +1,7 @@
 # Graph Report - swarna_khata_book  (2026-11-01)
 
 ## Corpus Check
-- 178 files · ~85,924 words
+- 178 files · ~86,046 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .bat 3, .css 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `afbebfb0`
+- Built from commit: `95735615`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -340,14 +340,14 @@ Nodes (12): beep(), isVideoReady(), makeReader(), MobileQRScanner(), startDecode
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Branch` connect `User` to `products_router.py`, `RateScrapeResult`, `billing_router.py`, `tenants_router.py`, `OldGoldValidationTestCase`, `NinjaPOSBillingTestCase`, `bills_router.py`, `auth_router.py`, `accounting_router.py`, `InvoiceSettingsTestCase`, `create_token`, `DayBookAccountingTestCase`, `Product`, `StockSummary`, `SecurityAuditAndAccessControlTestCase`, `ProductValidationTestCase`, `TrayQRTagsTestCase`, `DataExportTestCase`, `InvoiceSetting`, `download_invoice_pdf`, `tenants/admin.py`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+  _High betweenness centrality (0.065) - this node is a cross-community bridge._
 - **Are the 30 inferred relationships involving `Client` (e.g. with `export_tenant_data_to_zip()` and `generate_all_shops_export_archive()`) actually correct?**
   _`Client` has 30 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `swarna-khata-book` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `products_router.py` be split into smaller, more focused modules?**
   _Cohesion score 0.1103448275862069 - nodes in this community are weakly interconnected._
-- **Why does `Client` connect `StockSummary` to `export_tenant_data_to_zip`, `RateScrapeResult`, `tenants_router.py`, `OldGoldValidationTestCase`, `validate_password_policy`, `DataExportTestCase`, `NinjaPOSBillingTestCase`, `SecurityAuditAndAccessControlTestCase`, `bills_router.py`, `auth_router.py`, `TrayQRTagsTestCase`, `InvoiceSettingsTestCase`, `create_token`, `DayBookAccountingTestCase`, `Product`, `tenants/admin.py`, `User`, `ProductValidationTestCase`?**
+- **Why does `Product` connect `Product` to `products_router.py`, `export_tenant_data_to_zip`, `qr_tags_router.py`, `billing_router.py`, `tenants_router.py`, `OldGoldValidationTestCase`, `DataExportTestCase`, `TrayQRTagsTestCase`, `NinjaPOSBillingTestCase`, `pairing.py`, `InvoiceSettingsTestCase`, `resolve_and_record_scan`, `create_token`, `stock_router.py`, `StockSummary`, `SecurityAuditAndAccessControlTestCase`, `User`, `ProductValidationTestCase`?**
   _High betweenness centrality (0.041) - this node is a cross-community bridge._
 - **Are the 30 inferred relationships involving `User` (e.g. with `export_tenant_data_to_zip()` and `create_token()`) actually correct?**
   _`User` has 30 INFERRED edges - model-reasoned connections that need verification._

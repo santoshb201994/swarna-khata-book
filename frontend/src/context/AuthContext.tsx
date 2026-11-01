@@ -22,7 +22,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedUser = localStorage.getItem('user_info');
     if (savedUser && token) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        // Self-heal: If user is a tenant user but tenant_schema was hijacked to 'public',
+        // restore it to the user's authoritative tenant schema or 'demo'.
+        const currentTenant = localStorage.getItem('tenant_schema');
+        if (currentTenant === 'public' && parsed.role !== 'superadmin') {
+          const targetTenant = parsed.tenant_schema && parsed.tenant_schema !== 'public' ? parsed.tenant_schema : 'demo';
+          localStorage.setItem('tenant_schema', targetTenant);
+        }
       } catch {
         localStorage.clear();
       }

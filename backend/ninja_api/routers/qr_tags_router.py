@@ -51,9 +51,14 @@ def _format_tray(request, tray: Tray) -> dict:
     items_list = list(tray.items.select_related('purity', 'category', 'qr_tag').all())
 
     # Map item status using billing Item model
-    from apps.billing.models import Item
-    skus = [p.sku for p in items_list]
-    item_status_map = {item.qr_code: item.status for item in Item.objects.filter(qr_code__in=skus)}
+    item_status_map = {}
+    try:
+        from apps.billing.models import Item
+        skus = [p.sku for p in items_list]
+        if skus:
+            item_status_map = {item.qr_code: item.status for item in Item.objects.filter(qr_code__in=skus)}
+    except Exception as e:
+        logger.warning("Could not query billing Item status map for tray: %s", e)
 
     items_out = []
     total_gross = Decimal('0.000')

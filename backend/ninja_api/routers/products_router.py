@@ -117,9 +117,14 @@ def list_products(
 
     qs = qs.order_by('-id')
     # Batch query corresponding Item statuses for high-speed listing
-    from apps.billing.models import Item
-    skus = [p.sku for p in qs]
-    item_status_map = {item.qr_code: item.status for item in Item.objects.filter(qr_code__in=skus)}
+    item_status_map = {}
+    try:
+        from apps.billing.models import Item
+        skus = [p.sku for p in qs]
+        if skus:
+            item_status_map = {item.qr_code: item.status for item in Item.objects.filter(qr_code__in=skus)}
+    except Exception as e:
+        logger.warning("Could not query billing Item status map: %s", e)
 
     results = []
     for prod in qs:
