@@ -206,20 +206,39 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
     target_id = None
     target_sku = None
     target_huid = None
+    target_uuid = None
     data = None
 
     trimmed_payload = qr_payload.strip()
-    try:
-        data = json.loads(trimmed_payload)
-        if isinstance(data, dict):
-            target_id = data.get('id')
-            target_sku = data.get('sku')
-            target_huid = data.get('huid')
-        else:
-            target_sku = str(data)
-    except (json.JSONDecodeError, ValueError):
-        # Plain string payload (SKU or HUID)
-        target_sku = trimmed_payload
+    if trimmed_payload.upper().startswith('SKB:'):
+        candidate = trimmed_payload[4:].strip()
+        try:
+            target_uuid = uuid.UUID(candidate)
+        except (ValueError, TypeError):
+            target_sku = candidate
+    else:
+        try:
+            target_uuid = uuid.UUID(trimmed_payload)
+        except (ValueError, TypeError):
+            pass
+
+    if not target_uuid and not target_sku:
+        try:
+            data = json.loads(trimmed_payload)
+            if isinstance(data, dict):
+                target_id = data.get('id')
+                target_sku = data.get('sku')
+                target_huid = data.get('huid')
+                if data.get('qr_token'):
+                    try:
+                        target_uuid = uuid.UUID(str(data.get('qr_token')))
+                    except Exception:
+                        pass
+            else:
+                target_sku = str(data)
+        except (json.JSONDecodeError, ValueError):
+            # Plain string payload (SKU or HUID)
+            target_sku = trimmed_payload
 
     # 2b. Check if this is a Tray / Group QR code
     tray_obj = None
@@ -279,7 +298,17 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
     query = Product.objects.filter(is_active=True).select_related('category', 'purity', 'branch')
     product = None
 
-    if target_id:
+    if target_uuid:
+        from apps.billing.models import Item
+        item_obj = (
+            Item.objects.select_related('product', 'product__category', 'product__purity', 'product__branch')
+            .filter(qr_token=target_uuid)
+            .first()
+        )
+        if item_obj and item_obj.product and item_obj.product.is_active:
+            product = item_obj.product
+
+    if not product and target_id:
         product = query.filter(id=target_id).first()
     if not product and target_sku:
         product = query.filter(sku__iexact=target_sku).first()

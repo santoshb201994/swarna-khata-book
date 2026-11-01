@@ -120,9 +120,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/apps/billing/models.py": {
-    "mtime": 1793114343.6238577,
-    "seen": 1793114351.023283,
-    "ast_hash": "aa631e221bbfee3c58c852d46046eb08",
+    "mtime": 1793540419.2145834,
+    "seen": 1793540426.880243,
+    "ast_hash": "72040e1c6eb5cf8a15d693bf293d0b7e",
     "semantic_hash": ""
   },
   "backend/apps/billing/services.py": {
@@ -168,10 +168,10 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "backend/apps/products/models.py": {
-    "mtime": 1792734871.3085713,
-    "seen": 1792777341.4970007,
-    "ast_hash": "b22fc5e00768d581f4437607c7880708",
-    "semantic_hash": "b22fc5e00768d581f4437607c7880708"
+    "mtime": 1793540433.8023262,
+    "seen": 1793540441.6937716,
+    "ast_hash": "1622ed548b40ef67516cce74c7d1906b",
+    "semantic_hash": ""
   },
   "backend/apps/qr_tags/__init__.py": {
     "mtime": 1792734961.8615746,
@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "backend/apps/qr_tags/services.py": {
-    "mtime": 1793419397.8149493,
-    "seen": 1793419405.8450649,
-    "ast_hash": "0690efb9d7791a4c470f5347f0fb37a3",
+    "mtime": 1793541303.6487243,
+    "seen": 1793541311.206298,
+    "ast_hash": "b886b64cd9b5c0b430c82e1b657106a3",
     "semantic_hash": ""
   },
   "backend/apps/stock/__init__.py": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
-    "mtime": 1793498912.5092733,
-    "seen": 1793498915.4225354,
-    "ast_hash": "0f36224ba5faa7b23df2fbdbd0755c54",
+    "mtime": 1793541505.2048156,
+    "seen": 1793541513.7065768,
+    "ast_hash": "fa2d53e0dcfc4ff0f03755f9326cf967",
     "semantic_hash": ""
   },
   "frontend/src/features/camera/CameraCaptureModal.tsx": {
@@ -378,16 +378,16 @@
     "semantic_hash": ""
   },
   "frontend/src/features/products/ProductList.tsx": {
-    "mtime": 1793420384.6927857,
-    "seen": 1793420392.224512,
-    "ast_hash": "7967348f5f0a6dbf4d1f8b1f8b5567a3",
+    "mtime": 1793541537.3451693,
+    "seen": 1793541545.5991995,
+    "ast_hash": "e8723fee84cbf01ea32eaacf402ab554",
     "semantic_hash": ""
   },
   "frontend/src/features/products/QRTagModal.tsx": {
-    "mtime": 1792736976.5712693,
-    "seen": 1792777341.4970007,
-    "ast_hash": "f64a769606f7df8f68ddf4134dd1b745",
-    "semantic_hash": "f64a769606f7df8f68ddf4134dd1b745"
+    "mtime": 1793541541.8205116,
+    "seen": 1793541545.5991995,
+    "ast_hash": "eb6c4f18e19679c68c6e256996c087bb",
+    "semantic_hash": ""
   },
   "frontend/src/main.tsx": {
     "mtime": 1793130239.571105,
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "frontend/src/types/index.ts": {
-    "mtime": 1793419652.7319422,
-    "seen": 1793419660.304791,
-    "ast_hash": "81615d7c3bfad40d238af56e1936263a",
+    "mtime": 1793541083.712041,
+    "seen": 1793541091.6139393,
+    "ast_hash": "44ee68a1ce5e4df7043ae400ef24407a",
     "semantic_hash": ""
   },
   "frontend/tsconfig.app.json": {
@@ -516,9 +516,9 @@
     "semantic_hash": ""
   },
   "backend/apps/billing/pairing.py": {
-    "mtime": 1793419532.901691,
-    "seen": 1793419540.6393673,
-    "ast_hash": "f566284f127a81528c708ac441f25dd0",
+    "mtime": 1793541270.8881247,
+    "seen": 1793541278.9606798,
+    "ast_hash": "902b48d8eb5b61700b89cf0a39d128d1",
     "semantic_hash": ""
   },
   "backend/apps/billing/websocket_handler.py": {
@@ -612,9 +612,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
-    "mtime": 1793419434.085852,
-    "seen": 1793419441.965038,
-    "ast_hash": "12a6eac9f5ee2c5b869825c5bf986a88",
+    "mtime": 1793541121.0177739,
+    "seen": 1793541122.2244127,
+    "ast_hash": "e98c6a0f027c46466a16fcf1779d4f4b",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/__init__.py": {
@@ -630,9 +630,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
-    "mtime": 1793530189.7412968,
-    "seen": 1793530197.2879837,
-    "ast_hash": "afd690e89b8f18782ff63c881d69d913",
+    "mtime": 1793541178.5225272,
+    "seen": 1793541181.5893364,
+    "ast_hash": "e524810ec3456f873e79363d75b049f4",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/stock_router.py": {
@@ -642,9 +642,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/billing_router.py": {
-    "mtime": 1793130017.834123,
-    "seen": 1793130018.9447327,
-    "ast_hash": "d7e5bfe7b1eb2887ea227566d02e4f36",
+    "mtime": 1793541238.8160696,
+    "seen": 1793541246.9126627,
+    "ast_hash": "1539fc844c5ef39929aa05dd143e8e78",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/accounting_router.py": {
@@ -720,9 +720,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/bills_router.py": {
-    "mtime": 1792920837.6723137,
-    "seen": 1792920845.6057386,
-    "ast_hash": "19836f79452cfcf7f17261ea9dfd96f7",
+    "mtime": 1793541286.2639585,
+    "seen": 1793541294.1064217,
+    "ast_hash": "63f1eb08e85dac444fed5ad3a5de9383",
     "semantic_hash": ""
   },
   "backend/tests/test_backend_authoritative_polling.py": {
@@ -1107,6 +1107,36 @@
     "mtime": 1793510548.3721325,
     "seen": 1793510551.681211,
     "ast_hash": "1440ce5fdb2a09b2a45f98046653ba8b",
+    "semantic_hash": ""
+  },
+  "backend/apps/billing/migrations/0006_item_qr_token_and_product.py": {
+    "mtime": 1793540584.7857141,
+    "seen": 1793540592.8402743,
+    "ast_hash": "d0a4e13e377e10bffa214fbd3af9e8a8",
+    "semantic_hash": ""
+  },
+  "backend/apps/billing/migrations/0007_populate_item_inventory.py": {
+    "mtime": 1793540607.7297673,
+    "seen": 1793540615.6391053,
+    "ast_hash": "0437690fa19c932ab02905a71326db4b",
+    "semantic_hash": ""
+  },
+  "frontend/src/utils/qrPayload.ts": {
+    "mtime": 1793541073.149404,
+    "seen": 1793541081.358966,
+    "ast_hash": "ac8c85fbcc5783a49f70b6c94e10282a",
+    "semantic_hash": ""
+  },
+  "frontend/src/features/products/BulkQRPrintModal.tsx": {
+    "mtime": 1793541394.7529893,
+    "seen": 1793541403.100288,
+    "ast_hash": "f8c16251c04be4ac286f781771b9c952",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_unified_qr_architecture.py": {
+    "mtime": 1793541600.4355776,
+    "seen": 1793541608.273106,
+    "ast_hash": "4a7952c105efdb3b71c0a093e9e7e118",
     "semantic_hash": ""
   }
 }

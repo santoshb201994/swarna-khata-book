@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 from typing import Optional, List
 from datetime import date, datetime
@@ -236,6 +237,8 @@ class ProductOut(BaseModel):
     huid: Optional[str] = ''
     photo_url: Optional[str] = None
     qr_code_url: Optional[str] = None
+    qr_token: Optional[uuid.UUID] = None
+    printed_count: Optional[int] = 0
     is_active: bool
     branch_id: Optional[int] = None
     created_at: datetime
@@ -261,6 +264,8 @@ class ProductListOut(BaseModel):
     huid: Optional[str] = ''
     photo_url: Optional[str] = None
     qr_code_url: Optional[str] = None
+    qr_token: Optional[uuid.UUID] = None
+    printed_count: Optional[int] = 0
     item_status: Optional[str] = 'AVAILABLE'
     is_active: bool
     created_at: Optional[datetime] = None
@@ -832,4 +837,38 @@ class ScanItemResponse(BaseModel):
     bill_id: uuid.UUID
     item: ItemOut
     is_duplicate: bool = False
+
+
+class QRItemResponseSchema(BaseModel):
+    id: int
+    qr_token: uuid.UUID
+    sku: str
+    product_name: str
+    category_name: Optional[str] = None
+    purity_name: Optional[str] = None
+    gross_weight: Decimal
+    stone_weight: Optional[Decimal] = Decimal('0.000')
+    other_weight: Optional[Decimal] = Decimal('0.000')
+    net_weight: Decimal
+    stock_status: str
+    huid: Optional[str] = None
+    making_charge_type: Optional[str] = None
+    making_charge_value: Optional[Decimal] = None
+    description: Optional[str] = None
+    branch_name: Optional[str] = None
+    printed_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QRVerifyIn(BaseModel):
+    scanned_payload: str = Field(..., min_length=1, max_length=512)
+
+
+class QRVerifyOut(BaseModel):
+    success: bool
+    match: bool
+    message: str
+    qr_token: uuid.UUID
+    printed_count: int
 

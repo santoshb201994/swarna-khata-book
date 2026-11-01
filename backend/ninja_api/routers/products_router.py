@@ -27,6 +27,10 @@ def _format_product(request, prod: Product) -> dict:
     except Exception:
         pass
 
+    first_item = prod.items.first() if hasattr(prod, 'items') else None
+    qr_token = first_item.qr_token if first_item else None
+    printed_count = first_item.printed_count if first_item else 0
+
     return {
         "id": prod.id,
         "name": prod.name,
@@ -46,6 +50,8 @@ def _format_product(request, prod: Product) -> dict:
         "huid": prod.huid,
         "photo_url": photo_url,
         "qr_code_url": qr_url,
+        "qr_token": qr_token,
+        "printed_count": printed_count,
         "is_active": prod.is_active,
         "branch_id": prod.branch_id,
         "created_at": prod.created_at,
@@ -100,7 +106,7 @@ def list_products(
     """
     Search and list products with optional filters on SKU, name, purity, category.
     """
-    qs = Product.objects.select_related('category', 'purity', 'branch', 'qr_tag', 'stock_summary').all()
+    qs = Product.objects.select_related('category', 'purity', 'branch', 'qr_tag', 'stock_summary').prefetch_related('items').all()
     if is_active is True:
         # Shop inventory strictly excludes sold or depleted items (quantity_on_hand <= 0)
         qs = qs.filter(is_active=True).exclude(stock_summary__quantity_on_hand__lte=0)
@@ -136,7 +142,15 @@ def list_products(
         except Exception:
             pass
 
-        raw_status = item_status_map.get(prod.sku)
+        # Identify physical item token & status
+        first_item = None
+        for it in prod.items.all():
+            first_item = it
+            break
+        qr_token = first_item.qr_token if first_item else None
+        printed_count = first_item.printed_count if first_item else 0
+
+        raw_status = first_item.status if first_item else item_status_map.get(prod.sku)
         stock_qty = getattr(getattr(prod, 'stock_summary', None), 'quantity_on_hand', None)
         if (stock_qty is not None and stock_qty <= 0) or not prod.is_active or raw_status == 'SOLD':
             effective_status = 'SOLD'
@@ -162,6 +176,8 @@ def list_products(
             "huid": prod.huid,
             "photo_url": photo_url,
             "qr_code_url": qr_url,
+            "qr_token": qr_token,
+            "printed_count": printed_count,
             "item_status": effective_status,
             "is_active": prod.is_active and (stock_qty is None or stock_qty > 0),
             "created_at": prod.created_at,
@@ -214,17 +230,22 @@ def create_product(request, payload: ProductIn):
         is_active=True,
     )
 
-    # 1. Automatically generate high-resolution QR Tag
-    generate_qr_for_product(prod)
-
-    # 2. Automatically register into authoritative Item inventory for POS & QR Scanner
+    # 1. Automatically register into authoritative Item inventory with permanent UUID qr_token
     from apps.billing.models import Item
-    Item.objects.update_or_create(
+    item = Item.objects.create(
+        product=prod,
         qr_code=prod.sku,
+        name=prod.name,
+        weight=prod.gross_weight,
+        status=Item.Status.AVAILABLE,
+    )
+
+    # 2. Maintain QRTag metadata without storing bulky image binary
+    from apps.qr_tags.models import QRTag
+    QRTag.objects.update_or_create(
+        product=prod,
         defaults={
-            'name': prod.name,
-            'weight': prod.gross_weight,
-            'status': Item.Status.AVAILABLE,
+            'qr_data': f"SKB:{item.qr_token}"
         }
     )
 
@@ -248,7 +269,7 @@ def create_product(request, payload: ProductIn):
 @router.get("/products/{product_id}/", response=ProductOut, auth=jwt_auth)
 def get_product(request, product_id: int):
     prod = get_object_or_404(
-        Product.objects.select_related('category', 'purity', 'branch', 'qr_tag'),
+        Product.objects.select_related('category', 'purity', 'branch', 'qr_tag').prefetch_related('items'),
         id=product_id
     )
     return _format_product(request, prod)

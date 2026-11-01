@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import List, Optional
 from decimal import Decimal, ROUND_HALF_UP
 from django.shortcuts import get_object_or_404
@@ -21,7 +22,8 @@ from apps.stock.services import record_stock_movement
 from ninja_api.auth import jwt_auth, require_role
 from ninja_api.schemas import (
     SaleCreateIn, SaleOut, SaleListOut, SaleItemOut, PaymentOut, AddPaymentIn,
-    InvoiceSettingOut, InvoiceSettingUpdateIn
+    InvoiceSettingOut, InvoiceSettingUpdateIn,
+    QRItemResponseSchema, QRVerifyIn, QRVerifyOut
 )
 
 router = Router(tags=["POS Billing & Invoicing Engine"])
@@ -636,3 +638,166 @@ def add_sale_payment(request, sale_id: int, payload: AddPaymentIn):
 
     sale = Sale.objects.select_related('customer', 'branch').prefetch_related('items', 'payments').get(id=sale.id)
     return 200, _format_sale(sale)
+
+
+# ==============================================================================
+# UNIFIED QR ARCHITECTURE: RESOLUTION & PHYSICAL TAG VERIFICATION
+# ==============================================================================
+
+def _resolve_item_by_token(token_str: str):
+    """
+    Safely resolves an Item by UUID or legacy SKU.
+    Strips 'SKB:' prefix if present and handles UUID v4.
+    """
+    clean_token = (token_str or '').strip()
+    if clean_token.upper().startswith("SKB:"):
+        clean_token = clean_token[4:].strip()
+
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(clean_token)
+    except (ValueError, TypeError, AttributeError):
+        parsed_uuid = None
+
+    item = None
+    if parsed_uuid:
+        item = (
+            Item.objects.select_related(
+                'product',
+                'product__purity',
+                'product__category',
+                'product__branch'
+            )
+            .filter(qr_token=parsed_uuid)
+            .first()
+        )
+
+    if not item:
+        # Fallback to qr_code string or SKU
+        item = (
+            Item.objects.select_related(
+                'product',
+                'product__purity',
+                'product__category',
+                'product__branch'
+            )
+            .filter(qr_code__iexact=clean_token)
+            .first()
+        )
+
+    if not item:
+        # Check if Product exists by SKU and auto-register Item
+        prod = (
+            Product.objects.select_related(
+                'category',
+                'purity',
+                'branch'
+            )
+            .filter(sku__iexact=clean_token)
+            .first()
+        )
+        if prod:
+            item, _ = Item.objects.get_or_create(
+                product=prod,
+                defaults={
+                    'qr_code': prod.sku,
+                    'name': prod.name,
+                    'weight': prod.gross_weight,
+                    'status': Item.Status.AVAILABLE,
+                }
+            )
+            item.product = prod
+
+    return item
+
+
+@router.get("/pos/items/by-qr/{qr_token}/", response={200: QRItemResponseSchema, 403: dict, 404: dict}, auth=jwt_auth)
+@router.get("/pos/items/by-qr/{qr_token}", response={200: QRItemResponseSchema, 403: dict, 404: dict}, auth=jwt_auth, include_in_schema=False)
+def get_item_by_qr(request, qr_token: str):
+    """
+    High-performance indexed lookup for jewellery items by permanent UUID qr_token.
+    Supports canonical 'SKB:<UUID>' payload, raw UUID, and legacy SKU fallback.
+    Enforces multi-tenant and branch RBAC.
+    """
+    item = _resolve_item_by_token(qr_token)
+    if not item:
+        return 404, {"error": f"Item with identifier '{qr_token}' not found in inventory."}
+
+    # Branch RBAC Check
+    user = request.auth
+    user_branch_id = getattr(user, 'branch_id', None)
+    user_role = getattr(user, 'role', 'staff')
+    if user_branch_id and user_role not in ['owner', 'admin', 'manager']:
+        item_branch_id = getattr(item.product, 'branch_id', None) if item.product else None
+        if item_branch_id and item_branch_id != user_branch_id:
+            return 403, {"error": "Item belongs to a different branch. You are not authorized to view or bill it."}
+
+    prod = item.product
+    stock_status = item.status
+    if prod and (not prod.is_active):
+        stock_status = 'SOLD'
+
+    return 200, {
+        "id": item.id,
+        "qr_token": item.qr_token,
+        "sku": prod.sku if prod else item.qr_code,
+        "product_name": prod.name if prod else (item.name or "Jewellery Item"),
+        "category_name": prod.category.name if prod and prod.category else "Jewellery",
+        "purity_name": prod.purity.name if prod and prod.purity else "22KT",
+        "gross_weight": prod.gross_weight if prod else item.weight,
+        "stone_weight": prod.stone_weight if prod else Decimal('0.000'),
+        "other_weight": prod.other_weight if prod else Decimal('0.000'),
+        "net_weight": prod.net_weight if prod else item.weight,
+        "stock_status": stock_status,
+        "huid": prod.huid if prod else None,
+        "making_charge_type": prod.making_charge_type if prod else "per_gram",
+        "making_charge_value": prod.making_charge_value if prod else Decimal('0.00'),
+        "description": prod.description if prod else None,
+        "branch_name": prod.branch.name if prod and prod.branch else None,
+        "printed_count": item.printed_count,
+    }
+
+
+@router.post("/pos/items/{qr_token}/verify-tag/", response={200: QRVerifyOut, 404: dict}, auth=jwt_auth)
+@router.post("/pos/items/{qr_token}/verify-tag", response={200: QRVerifyOut, 404: dict}, auth=jwt_auth, include_in_schema=False)
+def verify_physical_tag(request, qr_token: str, payload: QRVerifyIn):
+    """
+    Physical Tag Verification:
+    Validates that a physically scanned tag matches the item's canonical UUID or legacy SKU.
+    Increments printed_count and returns verification badge status.
+    """
+    item = _resolve_item_by_token(qr_token)
+    if not item:
+        return 404, {"error": f"Item with identifier '{qr_token}' not found."}
+
+    scanned = payload.scanned_payload.strip()
+    clean_scanned = scanned
+    if clean_scanned.upper().startswith("SKB:"):
+        clean_scanned = clean_scanned[4:].strip()
+
+    is_match = False
+    # 1. UUID Match
+    if clean_scanned.lower() == str(item.qr_token).lower():
+        is_match = True
+    # 2. Legacy SKU or qr_code Match
+    elif clean_scanned.lower() == item.qr_code.lower() or (item.product and clean_scanned.lower() == item.product.sku.lower()):
+        is_match = True
+
+    if is_match:
+        item.printed_count = (item.printed_count or 0) + 1
+        item.save(update_fields=['printed_count', 'updated_at'])
+        return 200, {
+            "success": True,
+            "match": True,
+            "message": "Physical tag verified successfully! Verified tag matches inventory record.",
+            "qr_token": item.qr_token,
+            "printed_count": item.printed_count,
+        }
+    else:
+        return 200, {
+            "success": False,
+            "match": False,
+            "message": f"Tag mismatch! Scanned payload '{scanned}' does not match item identity '{item.qr_token}'.",
+            "qr_token": item.qr_token,
+            "printed_count": item.printed_count,
+        }

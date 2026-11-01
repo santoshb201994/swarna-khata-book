@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.core.exceptions import ValidationError
 from decimal import Decimal
@@ -197,7 +198,15 @@ class Item(models.Model):
         IN_CART = 'IN_CART', 'In Cart'
         SOLD = 'SOLD', 'Sold'
 
-    qr_code = models.CharField(max_length=128, unique=True, db_index=True)
+    qr_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    product = models.ForeignKey(
+        'products.Product',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    qr_code = models.CharField(max_length=128, db_index=True, blank=True)
     name = models.CharField(max_length=200, blank=True)
     weight = models.DecimalField(max_digits=10, decimal_places=3, help_text="Weight in grams")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE, db_index=True)
@@ -208,17 +217,19 @@ class Item(models.Model):
         on_delete=models.SET_NULL,
         related_name='items'
     )
+    printed_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
+            models.Index(fields=['status', 'qr_token']),
             models.Index(fields=['status', 'qr_code']),
             models.Index(fields=['locked_by_bill', 'status']),
         ]
 
     def __str__(self):
-        return f"{self.qr_code} - {self.weight}g ({self.status})"
+        return f"{self.qr_code or self.name} ({self.qr_token}) - {self.weight}g ({self.status})"
 
 
 class IdempotencyRecord(models.Model):

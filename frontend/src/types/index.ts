@@ -45,9 +45,39 @@ export interface Product {
   huid: string;
   photo_url?: string;
   qr_code_url?: string;
+  qr_token?: string;
+  printed_count?: number;
   item_status?: 'AVAILABLE' | 'IN_CART' | 'SOLD';
   is_active: boolean;
   created_at: string;
+}
+
+export interface QRItemResponse {
+  id: number;
+  qr_token: string;
+  sku: string;
+  product_name: string;
+  category_name?: string;
+  purity_name?: string;
+  gross_weight: string | number;
+  stone_weight?: string | number;
+  other_weight?: string | number;
+  net_weight: string | number;
+  stock_status: 'AVAILABLE' | 'IN_CART' | 'SOLD';
+  huid?: string;
+  making_charge_type?: string;
+  making_charge_value?: string | number;
+  description?: string;
+  branch_name?: string;
+  printed_count: number;
+}
+
+export interface QRVerifyResponse {
+  success: boolean;
+  match: boolean;
+  message: string;
+  qr_token: string;
+  printed_count: number;
 }
 
 export interface GoldRate {

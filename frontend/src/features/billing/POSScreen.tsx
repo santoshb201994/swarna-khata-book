@@ -22,6 +22,7 @@ import { CustomerSelectOrAdd } from '../customers/CustomerSelectOrAdd';
 import { downloadInvoicePdf } from '../../utils/invoiceDownload';
 import { resolveProductRate } from './metalRateHelper';
 import { getWsBaseUrl } from '../../utils/backendUrl';
+import { parseQRPayload } from '../../utils/qrPayload';
 
 interface CartItem {
   product: Product;
@@ -326,11 +327,96 @@ export const POSScreen: React.FC = () => {
     }
   };
 
-  const handleScannedQR = (qrData: string) => {
+  const handleScannedQR = async (qrData: string) => {
+    const parsedPayload = parseQRPayload(qrData);
+
+    // 1. Canonical UUID Token Scan
+    if (parsedPayload.qrToken) {
+      // First check in-memory catalog
+      const match = products.find(
+        (p) =>
+          (p.qr_token && p.qr_token.toLowerCase() === parsedPayload.qrToken!.toLowerCase()) ||
+          p.sku.toLowerCase() === parsedPayload.qrToken!.toLowerCase()
+      );
+
+      if (match) {
+        if (match.item_status === 'SOLD' || !match.is_active) {
+          toast.error(`'${match.name}' is already sold and removed from inventory.`);
+          return;
+        }
+        addToCart(match);
+        toast.success(`Scanned: ${match.name}`);
+        return;
+      }
+
+      // If not in preloaded catalog, perform fast indexed lookup via Django Ninja endpoint
+      try {
+        const res = await api.get(`/pos/items/by-qr/${parsedPayload.qrToken}/`);
+        const itemData = res.data;
+        if (itemData) {
+          if (itemData.stock_status === 'SOLD') {
+            toast.error(`'${itemData.product_name}' is already sold.`);
+            return;
+          }
+          const resolvedProd: Product = {
+            id: itemData.id,
+            name: itemData.product_name,
+            sku: itemData.sku,
+            category: 0,
+            category_name: itemData.category_name,
+            purity: 0,
+            purity_name: itemData.purity_name,
+            gross_weight: String(itemData.gross_weight),
+            stone_weight: String(itemData.stone_weight || '0.000'),
+            other_weight: String(itemData.other_weight || '0.000'),
+            net_weight: String(itemData.net_weight),
+            making_charge_type: (itemData.making_charge_type || 'per_gram') as any,
+            making_charge_value: String(itemData.making_charge_value || '0.00'),
+            description: itemData.description || '',
+            hsn_code: '7113',
+            huid: itemData.huid || '',
+            qr_token: itemData.qr_token,
+            printed_count: itemData.printed_count,
+            item_status: itemData.stock_status,
+            is_active: itemData.stock_status !== 'SOLD',
+            created_at: new Date().toISOString(),
+          };
+          addToCart(resolvedProd);
+          toast.success(`Scanned: ${resolvedProd.name}`);
+          return;
+        }
+      } catch {
+        // Fall through to legacy handlers
+      }
+    }
+
+    // 2. Tray / Group QR code
+    if (parsedPayload.isTray && parsedPayload.trayCode) {
+      try {
+        const res = await api.get(`/trays/by-code/${parsedPayload.trayCode}/`);
+        const tray = res.data;
+        let addedCount = 0;
+        (tray.items || []).forEach((it: any) => {
+          const match = products.find((p) => p.sku === it.sku || p.id === it.id);
+          if (match && match.item_status !== 'SOLD' && match.is_active) {
+            addToCart(match);
+            addedCount++;
+          }
+        });
+        if (addedCount > 0) {
+          toast.success(`Scanned Tray "${tray.name}": Added ${addedCount} items to cart!`);
+        } else {
+          toast.error(`Tray "${tray.name}" has no available items in stock.`);
+        }
+      } catch {
+        toast.error(`Tray '${parsedPayload.trayCode}' not found in inventory.`);
+      }
+      return;
+    }
+
+    // 3. Legacy JSON format
     try {
       const parsed = JSON.parse(qrData);
-
-      // Handle Group / Tray QR code
       if (parsed && (parsed.type === 'tray' || parsed.is_tray || Array.isArray(parsed.items))) {
         const trayItems: any[] = parsed.items || [];
         let addedCount = 0;
@@ -357,45 +443,24 @@ export const POSScreen: React.FC = () => {
         }
         addToCart(match);
         toast.success(`Scanned: ${match.name}`);
-      } else {
-        toast.error(`Product with SKU ${parsed.sku} not in inventory or already sold`);
-      }
-    } catch {
-      // Check if it's a plain string Tray code
-      if (qrData.trim().toUpperCase().startsWith('TRAY-')) {
-        api.get(`/trays/by-code/${qrData.trim()}/`).then((res) => {
-          const tray = res.data;
-          let addedCount = 0;
-          (tray.items || []).forEach((it: any) => {
-            const match = products.find((p) => p.sku === it.sku || p.id === it.id);
-            if (match && match.item_status !== 'SOLD' && match.is_active) {
-              addToCart(match);
-              addedCount++;
-            }
-          });
-          if (addedCount > 0) {
-            toast.success(`Scanned Tray "${tray.name}": Added ${addedCount} items to cart!`);
-          } else {
-            toast.error(`Tray "${tray.name}" has no available items in stock.`);
-          }
-        }).catch(() => {
-          toast.error(`Tray '${qrData}' not found in inventory.`);
-        });
         return;
       }
+    } catch {
+      // not JSON
+    }
 
-      // If it's a plain string SKU
-      const match = products.find((p) => p.sku.toLowerCase() === qrData.toLowerCase());
-      if (match) {
-        if (match.item_status === 'SOLD' || !match.is_active) {
-          toast.error(`'${match.name}' is already sold and removed from inventory.`);
-          return;
-        }
-        addToCart(match);
-        toast.success(`Scanned: ${match.name}`);
-      } else {
-        toast.error(`Item '${qrData}' not in inventory or already sold`);
+    // 4. Plain string SKU
+    const targetSku = parsedPayload.sku || qrData.trim();
+    const match = products.find((p) => p.sku.toLowerCase() === targetSku.toLowerCase());
+    if (match) {
+      if (match.item_status === 'SOLD' || !match.is_active) {
+        toast.error(`'${match.name}' is already sold and removed from inventory.`);
+        return;
       }
+      addToCart(match);
+      toast.success(`Scanned: ${match.name}`);
+    } else {
+      toast.error(`Item '${qrData}' not in inventory or already sold`);
     }
   };
 

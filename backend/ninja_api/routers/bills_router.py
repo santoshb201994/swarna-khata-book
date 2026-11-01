@@ -115,15 +115,29 @@ def scan_item_into_bill(request, bill_id: uuid.UUID, payload: ScanItemIn):
     idempotency_key = idempotency_key.strip()
 
     with transaction.atomic():
+        # Parse canonical SKB:<UUID> or raw UUID
+        token_str = (payload.qr_code or '').strip()
+        if token_str.upper().startswith("SKB:"):
+            token_str = token_str[4:].strip()
+        parsed_uuid = None
+        try:
+            parsed_uuid = uuid.UUID(token_str)
+        except (ValueError, TypeError, AttributeError):
+            parsed_uuid = None
+
         # Step 1: Check IdempotencyRecord for the key
         existing_record = IdempotencyRecord.objects.select_related('bill').filter(
             bill_id=bill_id, key=idempotency_key
         ).first()
 
         if existing_record:
-            item = Item.objects.filter(qr_code=payload.qr_code).first()
+            if parsed_uuid:
+                item = Item.objects.filter(qr_token=parsed_uuid).first()
+            else:
+                item = Item.objects.filter(qr_code=payload.qr_code).first()
+
             if not item:
-                return 404, {"error": f"Item with QR code '{payload.qr_code}' not found."}
+                return 404, {"error": f"Item with QR identifier '{payload.qr_code}' not found."}
 
             return 200, {
                 "status": "success",
@@ -139,8 +153,11 @@ def scan_item_into_bill(request, bill_id: uuid.UUID, payload: ScanItemIn):
                 "is_duplicate": True,
             }
 
-        # Step 2: Query the Item by qr_code using select_for_update() (Pessimistic Row Lock)
-        item = Item.objects.select_for_update().filter(qr_code=payload.qr_code).first()
+        # Step 2: Query the Item using select_for_update() (Pessimistic Row Lock)
+        if parsed_uuid:
+            item = Item.objects.select_for_update().filter(qr_token=parsed_uuid).first()
+        else:
+            item = Item.objects.select_for_update().filter(qr_code=payload.qr_code).first()
 
         # Step 3: Validate item existence and status
         if not item:

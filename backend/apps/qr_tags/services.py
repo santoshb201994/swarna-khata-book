@@ -7,43 +7,23 @@ from .models import QRTag, Tray
 
 
 def generate_qr_for_product(product):
-    """Generate or update QR code for a product. Returns QRTag instance."""
-    # Build QR data payload
-    qr_data = {
-        'id': product.id,
-        'sku': product.sku,
-        'name': product.name,
-        'purity': product.purity.name if product.purity else '',
-        'gross_wt': str(product.gross_weight),
-        'net_wt': str(product.net_weight),
-        'huid': product.huid or '',
-    }
-    qr_payload = json.dumps(qr_data, separators=(',', ':'))
+    """
+    Unified QR Architecture:
+    Maintains QR identity metadata using canonical payload format 'SKB:<UUID>'.
+    Dynamic rendering is performed client-side in React; no image binaries are saved to disk or DB.
+    """
+    token = getattr(product, 'qr_token', None)
+    if not token and hasattr(product, 'items'):
+        item = product.items.first()
+        if item:
+            token = item.qr_token
 
-    # Generate QR image
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(qr_payload)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color='black', back_color='white')
+    qr_payload = f"SKB:{token}" if token else product.sku
 
-    # Save to bytes
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-    image_content = ContentFile(buffer.read(), name=f'qr_{product.sku}.png')
-
-    # Get or create QRTag
+    # Get or create QRTag metadata row without saving image bytes
     qr_tag, created = QRTag.objects.get_or_create(product=product)
     qr_tag.qr_data = qr_payload
-    if qr_tag.qr_image:
-        qr_tag.qr_image.delete(save=False)
-    qr_tag.qr_image.save(f'qr_{product.sku}.png', image_content, save=False)
-    qr_tag.save()
+    qr_tag.save(update_fields=['qr_data'])
     return qr_tag
 
 

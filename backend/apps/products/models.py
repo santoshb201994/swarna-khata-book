@@ -44,6 +44,18 @@ class Product(models.Model):
     def net_weight(self):
         return self.gross_weight - self.stone_weight - self.other_weight
 
+    @property
+    def qr_token(self):
+        """Permanent unique QR token of the physical inventory piece."""
+        cached = getattr(self, '_qr_token', None)
+        if cached is not None:
+            return cached
+        if hasattr(self, 'items'):
+            first = next((i for i in self.items.all() if i.status == 'AVAILABLE'), None) or self.items.first()
+            if first:
+                return first.qr_token
+        return None
+
     # Making charges
     making_charge_type = models.CharField(
         max_length=10,

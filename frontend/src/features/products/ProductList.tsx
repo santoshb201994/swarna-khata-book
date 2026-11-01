@@ -18,11 +18,13 @@ import {
   Edit3,
   CheckSquare,
   Square,
+  Printer,
 } from 'lucide-react';
 import api from '../../api/client';
 import type { Product, Category, Purity, Tray } from '../../types';
 import { ProductFormModal } from './ProductFormModal';
 import { QRTagModal } from './QRTagModal';
+import { BulkQRPrintModal } from './BulkQRPrintModal';
 import { ClubTrayModal } from './ClubTrayModal';
 import { TrayQRTagModal } from './TrayQRTagModal';
 import { useAuth } from '../../context/AuthContext';
@@ -79,6 +81,7 @@ export const ProductList: React.FC = () => {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProductForQR, setSelectedProductForQR] = useState<Product | null>(null);
+  const [isBulkPrintModalOpen, setIsBulkPrintModalOpen] = useState(false);
   const [isClubTrayModalOpen, setIsClubTrayModalOpen] = useState(false);
   const [editingTray, setEditingTray] = useState<Tray | null>(null);
   const [selectedTrayForQR, setSelectedTrayForQR] = useState<Tray | null>(null);
@@ -580,6 +583,14 @@ export const ProductList: React.FC = () => {
               className="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition"
             >
               Clear Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBulkPrintModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 shadow-md transition active:scale-95"
+            >
+              <Printer className="w-4 h-4 text-amber-400" />
+              <span>Bulk Print Tags ({selectedProductIds.size})</span>
             </button>
             <button
               onClick={handleOpenClubModal}
@@ -1295,6 +1306,13 @@ export const ProductList: React.FC = () => {
         isOpen={!!selectedProductForQR}
         onClose={() => setSelectedProductForQR(null)}
         product={selectedProductForQR}
+      />
+
+      {/* Bulk QR Print Modal for Selected Items */}
+      <BulkQRPrintModal
+        isOpen={isBulkPrintModalOpen}
+        onClose={() => setIsBulkPrintModalOpen(false)}
+        products={selectedProductsList}
       />
 
       {/* Club Products into Tray Modal */}
