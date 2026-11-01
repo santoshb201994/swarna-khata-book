@@ -125,8 +125,9 @@ ASGI_APPLICATION = 'config.asgi.application'
 # ==============================================================================
 # DATABASE (PostgreSQL multi-tenant backend)
 # ==============================================================================
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL") or config('DATABASE_URL', default=None)
 if DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.strip().strip("'").strip('"')
     tmpPostgres = urlparse(DATABASE_URL)
     DATABASES = {
         'default': {

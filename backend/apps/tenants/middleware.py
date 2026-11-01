@@ -18,6 +18,10 @@ class ProductionTenantMiddleware(TenantMainMiddleware):
     """
 
     def process_request(self, request):
+        # 0. Health check endpoint probe should bypass tenant resolution
+        if request.path.startswith('/api/health'):
+            return None
+
         # 1. Connection check & initial setup
         connection.set_schema_to_public()
         tenant_model = get_tenant_model()
