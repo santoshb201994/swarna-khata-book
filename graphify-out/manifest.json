@@ -1092,15 +1092,21 @@
     "semantic_hash": ""
   },
   "frontend/vercel.json": {
-    "mtime": 1793498971.3330379,
-    "seen": 1793498980.0175912,
-    "ast_hash": "cf6fad1ce721da13630f9f3e7b81fd0c",
+    "mtime": 1793510544.1584983,
+    "seen": 1793510551.681211,
+    "ast_hash": "1440ce5fdb2a09b2a45f98046653ba8b",
     "semantic_hash": ""
   },
   "start.sh": {
     "mtime": 1793505488.1409009,
     "seen": 1793505496.4438174,
     "ast_hash": "a9dbf09614b72e3dbdbcf9c8fe6cc998",
+    "semantic_hash": ""
+  },
+  "vercel.json": {
+    "mtime": 1793510548.3721325,
+    "seen": 1793510551.681211,
+    "ast_hash": "1440ce5fdb2a09b2a45f98046653ba8b",
     "semantic_hash": ""
   }
 }
