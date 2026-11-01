@@ -4,7 +4,7 @@ services:
     runtime: python
     autoDeployTrigger: commit
     buildCommand: uv sync --frozen && uv cache prune --ci && uv run --directory backend python manage.py collectstatic --noinput
-    startCommand: cd backend && exec uv run uvicorn config.asgi:application --host 0.0.0.0 --port $PORT
+    startCommand: cd backend && uv run python manage.py migrate_schemas --noinput && exec uv run uvicorn config.asgi:application --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health/
     envVars:
       - key: PYTHON_VERSION

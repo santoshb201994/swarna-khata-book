@@ -1,3 +1,4 @@
+import logging
 import random
 import string
 import datetime
@@ -5,6 +6,8 @@ from decimal import Decimal
 from typing import List, Optional
 from django.shortcuts import get_object_or_404
 from ninja import Router
+
+logger = logging.getLogger(__name__)
 
 from apps.qr_tags.models import QRTag, Tray
 from apps.products.models import Product

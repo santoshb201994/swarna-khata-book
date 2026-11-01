@@ -12,7 +12,9 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
-  const tenant = localStorage.getItem('tenant_schema') || 'demo'
+  const rawTenant = localStorage.getItem('tenant_schema')
+  // Store operations must never route to 'public' schema
+  const tenant = (!rawTenant || rawTenant === 'public') ? 'demo' : rawTenant
   config.headers['X-Tenant'] = tenant
 
   ;(config as unknown as { _startTime: number })._startTime = performance.now()
@@ -49,7 +51,8 @@ api.interceptors.response.use(
           if (!refreshPromise) {
             refreshPromise = (async () => {
               try {
-                const currentTenant = localStorage.getItem('tenant_schema') || 'demo'
+                const rawCurrentTenant = localStorage.getItem('tenant_schema')
+                const currentTenant = (!rawCurrentTenant || rawCurrentTenant === 'public') ? 'demo' : rawCurrentTenant
                 logger.info('auth', `Attempting access token refresh [Tenant: ${currentTenant}]`)
                 const refreshEndpoint = getApiBaseUrl().endsWith('/api')
                   ? `${getApiBaseUrl()}/auth/token/refresh/`
@@ -61,7 +64,7 @@ api.interceptors.response.use(
                 if (data.refresh) {
                   localStorage.setItem('refresh_token', data.refresh)
                 }
-                if (data.tenant_schema) {
+                if (data.tenant_schema && data.tenant_schema !== 'public') {
                   localStorage.setItem('tenant_schema', data.tenant_schema)
                 }
                 logger.info('auth', 'Access token refreshed successfully')

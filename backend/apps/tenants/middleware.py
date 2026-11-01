@@ -99,6 +99,34 @@ class ProductionTenantMiddleware(TenantMainMiddleware):
             # If no tenant found at all, try public
             tenant = tenant_model.objects.filter(schema_name=public_schema).first()
 
+        # Safeguard: Ensure tenant business endpoints never run under public schema
+        is_platform_path = (
+            request.path.startswith('/api/developer/') or
+            request.path.startswith('/api/tenants/') or
+            request.path.startswith('/api/health') or
+            request.path.startswith('/admin/') or
+            request.path.startswith('/static/') or
+            request.path.startswith('/media/')
+        )
+        if not is_platform_path and tenant and tenant.schema_name == public_schema:
+            header_schema = request.headers.get('X-Tenant') or request.META.get('HTTP_X_TENANT')
+            if header_schema and header_schema != public_schema:
+                candidate = tenant_model.objects.filter(schema_name=header_schema).first()
+                if candidate:
+                    tenant = candidate
+
+            if tenant.schema_name == public_schema:
+                fallback_tenant = (
+                    tenant_model.objects.filter(schema_name='demo').first() or
+                    tenant_model.objects.exclude(schema_name=public_schema).filter(is_active=True).first()
+                )
+                if fallback_tenant:
+                    logger.warning(
+                        "Tenant business endpoint '%s' attempted under public schema; auto-routing to '%s'",
+                        request.path, fallback_tenant.schema_name
+                    )
+                    tenant = fallback_tenant
+
         if not tenant:
             logger.warning(f"No tenant could be resolved for request to {request.get_host()}")
             return HttpResponseNotFound("Tenant not found. Please verify host or X-Tenant header.")

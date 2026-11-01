@@ -1,9 +1,12 @@
+import logging
 from typing import List, Optional
 from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from ninja import Router, File, UploadedFile
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 from apps.products.models import Category, Purity, Product
 from apps.stock.models import StockMovement, StockSummary

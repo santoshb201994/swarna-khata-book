@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "frontend/src/api/client.ts": {
-    "mtime": 1793512440.121521,
-    "seen": 1793512447.1490111,
-    "ast_hash": "71ff093aaa34c9055a2e16284197b231",
+    "mtime": 1793546558.403183,
+    "seen": 1793546558.939852,
+    "ast_hash": "6f31419990efa0c9f10c910e321c27c4",
     "semantic_hash": ""
   },
   "frontend/src/components/Layout.tsx": {
@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/middleware.py": {
-    "mtime": 1793499766.2019706,
-    "seen": 1793499773.5691593,
-    "ast_hash": "0654d92271f9529c48c264c4dfa65cbc",
+    "mtime": 1793546525.2880473,
+    "seen": 1793546532.8836496,
+    "ast_hash": "ff64e9867490968e0accb86553c95783",
     "semantic_hash": ""
   },
   "backend/apps/tenants/migrations/0001_initial.py": {
@@ -624,15 +624,15 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/auth_router.py": {
-    "mtime": 1793530179.0701144,
-    "seen": 1793530187.1907444,
-    "ast_hash": "f22b0c4fb4b4f12d1408aebf7cbbde49",
+    "mtime": 1793546540.6172392,
+    "seen": 1793546548.6633792,
+    "ast_hash": "a6be733c72b6535c73c1ab3c799311ff",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
-    "mtime": 1793541178.5225272,
-    "seen": 1793541181.5893364,
-    "ast_hash": "e524810ec3456f873e79363d75b049f4",
+    "mtime": 1793546492.2406697,
+    "seen": 1793546500.1563027,
+    "ast_hash": "74bc3dd6b549cc6efc9279d735b7f004",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/stock_router.py": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/qr_tags_router.py": {
-    "mtime": 1793530199.837044,
-    "seen": 1793530207.417308,
-    "ast_hash": "9242bc00296a6f8124ecb3f86ed4bb66",
+    "mtime": 1793546498.134755,
+    "seen": 1793546500.1563027,
+    "ast_hash": "d6a53d81117806802d142d62f591d802",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/pos_pairing_router.py": {
@@ -1080,9 +1080,9 @@
     "semantic_hash": ""
   },
   "render.yaml": {
-    "mtime": 1793531147.6008785,
-    "seen": 1793531148.9554894,
-    "ast_hash": "04a8c7388093cd6911d732518d235b04",
+    "mtime": 1793546571.0301502,
+    "seen": 1793546578.1313455,
+    "ast_hash": "2306f86c0fd63fe081fde1ee16c4d2d4",
     "semantic_hash": ""
   },
   "frontend/src/utils/backendUrl.ts": {

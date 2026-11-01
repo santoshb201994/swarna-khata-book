@@ -28,16 +28,38 @@ def obtain_token(request, payload: TokenRequest):
     """
     Authenticate user with credentials and issue JWT access & refresh tokens.
     Operates within the active tenant schema with cross-tenant resolution for tenant users.
+    Prioritizes store tenants over platform public schema so store users receive correct tenant context.
     """
-    user = authenticate(request, username=payload.username, password=payload.password)
+    from django.db import connection
+    from apps.tenants.models import Client
+    from django_tenants.utils import schema_context
+
+    user = None
     resolved_schema = None
 
-    if not user:
-        # Check across active tenant schemas if username/password matches
-        from apps.tenants.models import Client
-        from django_tenants.utils import schema_context
-        from django.db import connection
+    # 1. If explicit non-public tenant header is provided, authenticate within that tenant
+    header_tenant = request.headers.get('X-Tenant') or request.META.get('HTTP_X_TENANT')
+    if header_tenant and header_tenant != 'public':
+        with schema_context(header_tenant):
+            matched_user = authenticate(request, username=payload.username, password=payload.password)
+            if matched_user and matched_user.is_active:
+                user = matched_user
+                resolved_schema = header_tenant
+                tenant_obj = Client.objects.filter(schema_name=header_tenant).first()
+                if tenant_obj:
+                    connection.set_tenant(tenant_obj)
+                    request.tenant = tenant_obj
 
+    # 2. If active connection tenant is already a store tenant (not public), try it
+    current_conn_schema = getattr(connection, 'schema_name', 'public')
+    if not user and current_conn_schema != 'public':
+        matched_user = authenticate(request, username=payload.username, password=payload.password)
+        if matched_user and matched_user.is_active:
+            user = matched_user
+            resolved_schema = current_conn_schema
+
+    # 3. Check across active store tenant schemas (e.g. demo, etc.)
+    if not user:
         for tenant in Client.objects.filter(is_active=True).exclude(schema_name='public'):
             with schema_context(tenant.schema_name):
                 matched_user = authenticate(request, username=payload.username, password=payload.password)
@@ -48,9 +70,8 @@ def obtain_token(request, payload: TokenRequest):
                     request.tenant = tenant
                     break
 
+    # 4. Only if not matched in any store tenant, check public schema (platform superadmin / dev)
     if not user:
-        # Check if platform superadmin exists in public schema
-        from django_tenants.utils import schema_context
         with schema_context('public'):
             public_user = authenticate(request, username=payload.username, password=payload.password)
             if public_user and public_user.is_active and (public_user.is_superuser or public_user.role == 'superadmin'):
