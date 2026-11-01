@@ -5,6 +5,7 @@ import { getApiBaseUrl } from '../utils/backendUrl'
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30000, // 30-second timeout to handle Render cold starts
 })
 
 // Attach JWT token & Tenant header to every request and record telemetry

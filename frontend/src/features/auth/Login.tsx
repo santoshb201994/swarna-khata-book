@@ -34,7 +34,13 @@ export const Login: React.FC = () => {
       toast.success('Welcome back to Swarna Khata!');
       window.location.href = '/';
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid username or password');
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        (err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+          ? 'Backend server took too long to respond. The Render free tier instance may be waking up from sleep. Please wait 30 seconds and try again.'
+          : err.message || 'Invalid username or password');
+      toast.error(msg, { duration: 6000 });
     } finally {
       setIsSubmitting(false);
     }
@@ -101,8 +107,13 @@ export const Login: React.FC = () => {
       toast.success(`Store '${regShopName}' provisioned successfully!`);
       window.location.href = '/';
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Failed to register new store';
-      toast.error(msg);
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        (err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+          ? 'Backend server took too long to respond. The Render free tier instance may be waking up from sleep. Please wait 30 seconds and try again.'
+          : err.message || 'Failed to register new store');
+      toast.error(msg, { duration: 6000 });
     } finally {
       setIsSubmitting(false);
     }
@@ -212,7 +223,7 @@ export const Login: React.FC = () => {
               disabled={isSubmitting}
               className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl shadow-md transition transform active:scale-98 disabled:opacity-50"
             >
-              <span>{isSubmitting ? 'Signing in...' : 'Sign In to Store'}</span>
+              <span>{isSubmitting ? 'Signing in (connecting to backend)...' : 'Sign In to Store'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
