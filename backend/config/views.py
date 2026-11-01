@@ -1,7 +1,5 @@
 import time
 from django.http import JsonResponse
-from django.db import connection
-from asgiref.sync import sync_to_async
 
 
 async def health_check(request):
@@ -12,8 +10,19 @@ async def health_check(request):
     """
     db_status = "ok"
     try:
-        # Non-blocking async check on db connection
-        await sync_to_async(connection.ensure_connection)()
+        # Use a simple raw async SQL query via asgiref
+        from django.db import connection
+        from asgiref.sync import sync_to_async
+
+        @sync_to_async
+        def _check_db():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                return cursor.fetchone()
+
+        result = await _check_db()
+        if result != (1,):
+            db_status = "unhealthy: unexpected result from database ping"
     except Exception as exc:
         db_status = f"unhealthy: {str(exc)}"
 
