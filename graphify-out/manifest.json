@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "backend/config/settings.py": {
-    "mtime": 1793499787.3293817,
-    "seen": 1793499794.7648172,
-    "ast_hash": "f52dd5f45da261513d0b3e07c25dde56",
+    "mtime": 1793550872.7407343,
+    "seen": 1793550880.032036,
+    "ast_hash": "6e6585e4e083b658c7b5ebdca6f6999c",
     "semantic_hash": ""
   },
   "backend/config/urls.py": {
@@ -426,9 +426,9 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1793505464.6655302,
-    "seen": 1793505496.4438174,
-    "ast_hash": "c79ce9df73ddda151de6c01767c2eac0",
+    "mtime": 1793550747.8119617,
+    "seen": 1793550783.7028222,
+    "ast_hash": "39b845b9fbfe72f73002b98e47923b16",
     "semantic_hash": ""
   },
   "run_local.ps1": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/models.py": {
-    "mtime": 1792836084.8427455,
-    "seen": 1792836090.1797316,
-    "ast_hash": "be160f8463badfe48b5487ab3cb56aa8",
+    "mtime": 1793550478.0527773,
+    "seen": 1793550486.2270622,
+    "ast_hash": "b6619023231b4f624ecf186757bb30a7",
     "semantic_hash": ""
   },
   "backend/apps/tenants/admin.py": {
@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/middleware.py": {
-    "mtime": 1793546525.2880473,
-    "seen": 1793546532.8836496,
-    "ast_hash": "ff64e9867490968e0accb86553c95783",
+    "mtime": 1793550591.6744955,
+    "seen": 1793550599.567963,
+    "ast_hash": "5ac58036f19f568efbfe6a3a67232107",
     "semantic_hash": ""
   },
   "backend/apps/tenants/migrations/0001_initial.py": {
@@ -606,15 +606,15 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/auth.py": {
-    "mtime": 1793111144.1315048,
-    "seen": 1793111151.042048,
-    "ast_hash": "2cd9cc3305ea0f261f660f08ee365a1c",
+    "mtime": 1793550612.6687388,
+    "seen": 1793550620.8370707,
+    "ast_hash": "bc4abb3d3ea49d5f1930cbf8c4ada525",
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
-    "mtime": 1793541121.0177739,
-    "seen": 1793541122.2244127,
-    "ast_hash": "e98c6a0f027c46466a16fcf1779d4f4b",
+    "mtime": 1793550660.314043,
+    "seen": 1793550668.5896206,
+    "ast_hash": "80daf7166d80f058c8a27ef3a8e0edb8",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/__init__.py": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
-    "mtime": 1792921065.7940936,
-    "seen": 1792921073.5980363,
-    "ast_hash": "90e0e502b007b1d11967abe38c5ce518",
+    "mtime": 1793550678.8090258,
+    "seen": 1793550686.968883,
+    "ast_hash": "9e17fbc8cd069569eadf7fa472a3fdea",
     "semantic_hash": ""
   },
   "backend/ninja_api/api.py": {
@@ -996,9 +996,9 @@
     "semantic_hash": ""
   },
   "backend/config/logging_middleware.py": {
-    "mtime": 1793129847.6317396,
-    "seen": 1793129854.8701196,
-    "ast_hash": "b5b0ae7c3d525abb0d982b704ae44760",
+    "mtime": 1793550815.9445982,
+    "seen": 1793550824.161876,
+    "ast_hash": "91078318bf7500bf210529732a8a4fc5",
     "semantic_hash": ""
   },
   "frontend/src/utils/logger.ts": {
@@ -1137,6 +1137,66 @@
     "mtime": 1793541600.4355776,
     "seen": 1793541608.273106,
     "ast_hash": "4a7952c105efdb3b71c0a093e9e7e118",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/migrations/0002_client_idempotency_key_client_last_migrated_at_and_more.py": {
+    "mtime": 1793550489.7050917,
+    "seen": 1793550497.912693,
+    "ast_hash": "4169bc69f452c035d65b4c43a2d5973f",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/resolver.py": {
+    "mtime": 1793550573.6543756,
+    "seen": 1793550581.6175013,
+    "ast_hash": "0b4ad8367f4345cb424f6070ecc21063",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/provisioning.py": {
+    "mtime": 1793550646.9797983,
+    "seen": 1793550654.934096,
+    "ast_hash": "7d082d06a74d19cfe05bedf28578c16a",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/migrator.py": {
+    "mtime": 1793550693.4310546,
+    "seen": 1793550701.3058324,
+    "ast_hash": "fdf3b32c2313ea3cc823d453d9e9ab80",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/management/__init__.py": {
+    "mtime": 1793550704.3228657,
+    "seen": 1793550712.23674,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/management/commands/__init__.py": {
+    "mtime": 1793550708.9418824,
+    "seen": 1793550717.6110063,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/management/commands/migrate_tenants_safely.py": {
+    "mtime": 1793550717.1275473,
+    "seen": 1793550725.6583552,
+    "ast_hash": "565777f24bbff1b5d00126c35f81b12f",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/backup_service.py": {
+    "mtime": 1793552056.2351007,
+    "seen": 1793552064.7683358,
+    "ast_hash": "26781b4ba05d9db481b7e0378694a4c1",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_production_hardening.py": {
+    "mtime": 1793552433.2083633,
+    "seen": 1793552441.6817703,
+    "ast_hash": "44c4c256026ae47eb27a7d086a013c48",
+    "semantic_hash": ""
+  },
+  "backend/apps/billing/migrations/0008_rename_billing_ite_stat_qr_tok_idx_billing_ite_status_663592_idx.py": {
+    "mtime": 1793552379.514136,
+    "seen": 1793552387.45487,
+    "ast_hash": "048137125b2cda958bd5799dec54e8c7",
     "semantic_hash": ""
   }
 }

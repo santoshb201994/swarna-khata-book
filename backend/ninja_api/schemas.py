@@ -64,6 +64,7 @@ class StoreRegistrationIn(BaseModel):
     owner_phone: Optional[str] = ''
     address: Optional[str] = ''
     gstin: Optional[str] = ''
+    idempotency_key: Optional[str] = None
 
     @field_validator('owner_password')
     @classmethod
@@ -83,6 +84,8 @@ class StoreRegistrationOut(BaseModel):
     access: str
     refresh: str
     message: str
+    provisioning_status: Optional[str] = 'active'
+    is_idempotent_replay: Optional[bool] = False
 
 
 class PasswordResetIn(BaseModel):

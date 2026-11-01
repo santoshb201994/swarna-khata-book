@@ -17,122 +17,40 @@ from ninja_api.schemas import (
     PasswordResetIn, StaffStatusUpdateIn, SwitchStoreIn, TokenRequest, TokenResponse
 )
 
+from apps.tenants.provisioning import TenantProvisioningService, generate_schema_name
+
 router = Router(tags=["Tenant Store Onboarding & SaaS Management"])
-
-
-def generate_schema_name(shop_name: str) -> str:
-    """
-    Sanitize and generate a safe, unique PostgreSQL schema name.
-    Schema names must start with a letter and contain only lowercase letters, digits, and underscores.
-    """
-    base_slug = re.sub(r'[^a-z0-9_]', '', shop_name.strip().lower().replace(' ', '_'))
-    if not base_slug:
-        base_slug = "store"
-    
-    # Enforce PostgreSQL schema naming rules
-    candidate = f"t_{base_slug}"[:40]
-    
-    # Check uniqueness
-    if not Client.objects.filter(schema_name=candidate).exists():
-        return candidate
-    
-    short_suffix = uuid.uuid4().hex[:6]
-    return f"t_{base_slug[:33]}_{short_suffix}"
 
 
 @router.post("/tenants/register-store/", response={201: StoreRegistrationOut, 400: dict}, auth=None)
 def register_store(request, payload: StoreRegistrationIn):
     """
-    Public self-service jewellery store onboarding endpoint.
+    Idempotent, retry-safe public jewellery store onboarding endpoint.
     1. Validates strict Jewellery Shield password policy.
-    2. Provisions dedicated PostgreSQL schema via django-tenants.
-    3. Seeds initial Showroom Branch, default Gold/Silver categories and purities.
-    4. Creates Owner account and returns authenticated JWT tokens.
+    2. Runs TenantProvisioningService with state machine (INITIALIZING -> PROVISIONING -> SEEDING -> ACTIVE).
+    3. Provisions dedicated PostgreSQL schema with canary validation.
+    4. Seeds initial Showroom Branch, default Gold/Silver categories and purities.
+    5. Creates Owner account and returns authenticated JWT tokens.
     """
-    # Check if username or shop name is valid
     if len(payload.owner_username.strip()) < 3:
         return 400, {"error": "Username must be at least 3 characters long."}
 
-    schema_name = generate_schema_name(payload.shop_name)
-    domain_host = f"{schema_name}.swarnakhata.internal"
+    # Extract optional Idempotency-Key header if provided by client HTTP headers
+    header_idempotency = request.headers.get('Idempotency-Key') or request.META.get('HTTP_IDEMPOTENCY_KEY')
+    effective_idempotency_key = payload.idempotency_key or header_idempotency
 
     try:
-        # Create tenant client and primary domain in public schema
-        with schema_context('public'):
-            tenant = Client(
-                schema_name=schema_name,
-                name=payload.shop_name.strip(),
-                description=f"Jewellery retail showroom for {payload.shop_name.strip()}",
-                is_active=True
-            )
-            tenant.save()
-
-            domain = Domain(
-                domain=domain_host,
-                tenant=tenant,
-                is_primary=True
-            )
-            domain.save()
-
-        # Seed initial showroom records inside the new tenant schema
-        with schema_context(schema_name):
-            # 1. Main Showroom Branch
-            main_branch = Branch.objects.create(
-                name="Main Showroom",
-                address=payload.address or "",
-                phone=payload.owner_phone or "",
-                gstin=payload.gstin or "",
-                is_active=True
-            )
-
-            # 2. Store Owner User
-            owner = User(
-                username=payload.owner_username.strip(),
-                email=payload.owner_email or "",
-                phone=payload.owner_phone or "",
-                role=User.Role.OWNER,
-                branch=main_branch,
-                is_staff=True,
-                is_active=True
-            )
-            owner.set_password(payload.owner_password)
-            owner.save()
-
-            # 3. Seed Default Categories
-            default_categories = ["Gold Jewellery", "Silver Ornaments", "Diamond Jewellery", "Platinum"]
-            for cat_name in default_categories:
-                Category.objects.get_or_create(name=cat_name)
-
-            # 4. Seed Standard Purities
-            default_purities = [
-                ("24KT Pure Gold", Decimal('0.999')),
-                ("22KT Hallmarked 916", Decimal('0.916')),
-                ("18KT Diamond Studded", Decimal('0.750')),
-                ("925 Sterling Silver", Decimal('0.925')),
-            ]
-            for p_name, fineness in default_purities:
-                Purity.objects.get_or_create(name=p_name, defaults={'fineness': fineness})
-
-            # 5. Default Shop Rate Setting
-            ShopRateSetting.objects.get_or_create(
-                branch=main_branch,
-                defaults={'preferred_source': 'ksjf'}
-            )
-
-            # 6. Issue JWT tokens
-            access_tok = create_token(owner, token_type='access')
-            refresh_tok = create_token(owner, token_type='refresh')
-
-        return 201, {
-            "schema_name": schema_name,
-            "shop_name": payload.shop_name.strip(),
-            "domain": domain_host,
-            "owner_username": owner.username,
-            "access": access_tok,
-            "refresh": refresh_tok,
-            "message": f"Store '{payload.shop_name}' registered successfully with isolated database schema."
-        }
-
+        result = TenantProvisioningService.provision_store(
+            shop_name=payload.shop_name,
+            owner_username=payload.owner_username,
+            owner_password=payload.owner_password,
+            owner_email=payload.owner_email,
+            owner_phone=payload.owner_phone,
+            address=payload.address,
+            gstin=payload.gstin,
+            idempotency_key=effective_idempotency_key
+        )
+        return 201, result
     except Exception as exc:
         return 400, {"error": f"Failed to register store: {str(exc)}"}
 

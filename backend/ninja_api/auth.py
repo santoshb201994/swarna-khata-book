@@ -223,3 +223,33 @@ def require_role(user: User, allowed_roles: list[str]):
         return True
 
     raise PermissionError(f"Access denied. Requires one of roles: {', '.join(allowed_roles)}")
+
+
+def require_branch_access(user: User, branch_id) -> bool:
+    """
+    Enforces Multi-Branch Store Isolation:
+    - Superadmins and Store Owners have universal access to all branches within the store tenant.
+    - Managers, Accountants, and Staff are strictly restricted to their assigned branch.
+    - If user has no branch assigned or target branch_id differs from their assigned branch,
+      raises PermissionError (HTTP 403).
+    """
+    if not user or not user.is_authenticated:
+        raise PermissionError("Authentication required.")
+
+    if user.is_superuser or user.role in ['superadmin', 'owner']:
+        return True
+
+    if not branch_id:
+        return True
+
+    if not user.branch_id:
+        raise PermissionError("User is not assigned to any branch.")
+
+    if str(user.branch_id) != str(branch_id):
+        raise PermissionError(
+            f"Branch access violation: User is assigned to Branch {user.branch_id}, "
+            f"cannot operate on Branch {branch_id}."
+        )
+
+    return True
+

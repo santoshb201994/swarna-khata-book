@@ -126,9 +126,19 @@ ASGI_APPLICATION = 'config.asgi.application'
 # DATABASE (PostgreSQL multi-tenant backend)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL") or config('DATABASE_URL', default=None)
-if DATABASE_URL:
-    DATABASE_URL = DATABASE_URL.strip().strip("'").strip('"')
-    tmpPostgres = urlparse(DATABASE_URL)
+DATABASE_MIGRATION_URL = os.getenv("DATABASE_MIGRATION_URL") or config('DATABASE_MIGRATION_URL', default=None)
+
+# For migrations (manage.py migrate / migrate_schemas), use dedicated migration role if configured
+import sys
+is_running_migration = any(cmd in sys.argv for cmd in ['migrate', 'migrate_schemas', 'makemigrations'])
+active_db_url = (DATABASE_MIGRATION_URL if is_running_migration and DATABASE_MIGRATION_URL else DATABASE_URL)
+
+if active_db_url:
+    active_db_url = active_db_url.strip().strip("'").strip('"')
+    tmpPostgres = urlparse(active_db_url)
+    is_pooled = '-pooler' in (tmpPostgres.hostname or '')
+    # In PgBouncer transaction pooling, CONN_MAX_AGE must be 0 to prevent cross-request session leakage
+    default_max_age = 0 if is_pooled else int(config('DB_CONN_MAX_AGE', default='60'))
     DATABASES = {
         'default': {
             'ENGINE': 'django_tenants.postgresql_backend',
@@ -137,6 +147,7 @@ if DATABASE_URL:
             'PASSWORD': tmpPostgres.password,
             'HOST': tmpPostgres.hostname,
             'PORT': tmpPostgres.port or 5432,
+            'CONN_MAX_AGE': default_max_age,
             'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
         }
     }
@@ -149,6 +160,7 @@ else:
             'PASSWORD': config('DB_PASSWORD', default='GoldShop@2026#Db'),
             'HOST': config('DB_HOST', default='127.0.0.1'),
             'PORT': config('DB_PORT', default='5433'),
+            'CONN_MAX_AGE': int(config('DB_CONN_MAX_AGE', default='60')),
         }
     }
 
@@ -297,6 +309,11 @@ LOGGING = {
         },
         'swarnakhata.audit': {
             'handlers': ['console', 'file_audit'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'swarnakhata.performance': {
+            'handlers': ['console', 'file_app'],
             'level': 'INFO',
             'propagate': False,
         },
