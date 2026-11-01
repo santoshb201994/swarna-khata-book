@@ -27,12 +27,14 @@ async def health_check(request):
         db_status = f"unhealthy: {str(exc)}"
 
     is_healthy = db_status == "ok"
+    import os
     return JsonResponse(
         {
             "status": "healthy" if is_healthy else "degraded",
             "database": db_status,
             "timestamp": time.time(),
             "service": "swarna-khata-erp",
+            "commit": os.getenv("RENDER_GIT_COMMIT", "dev")[:7],
         },
         status=200 if is_healthy else 503,
     )
