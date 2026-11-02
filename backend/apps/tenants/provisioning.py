@@ -50,12 +50,17 @@ class TenantProvisioningService:
         owner_phone: Optional[str] = "",
         address: Optional[str] = "",
         gstin: Optional[str] = "",
-        idempotency_key: Optional[str] = None
+        idempotency_key: Optional[str] = None,
+        async_mode: bool = False
     ) -> Dict[str, Any]:
         """
         Idempotently provisions a complete tenant with dedicated PostgreSQL schema.
-        Only activates the store after migrations, seeding, and verification succeed.
+        Supports both synchronous execution and non-blocking asynchronous execution
+        with background thread schema creation and status polling.
         """
+        import threading
+        from django.db import connection
+
         # 1. Idempotency Check
         if idempotency_key:
             existing = Client.objects.filter(idempotency_key=idempotency_key).first()
@@ -78,6 +83,18 @@ class TenantProvisioningService:
                         "is_idempotent_replay": True,
                         "message": f"Store '{existing.name}' is already active and verified."
                     }
+                elif existing.provisioning_status == Client.ProvisioningStatus.PROVISIONING:
+                    return {
+                        "schema_name": existing.schema_name,
+                        "shop_name": existing.name,
+                        "domain": getattr(existing.domains.first(), 'domain', ''),
+                        "owner_username": owner_username,
+                        "access": "",
+                        "refresh": "",
+                        "provisioning_status": Client.ProvisioningStatus.PROVISIONING,
+                        "is_idempotent_replay": True,
+                        "message": f"Store '{existing.name}' provisioning is currently in progress."
+                    }
                 elif existing.provisioning_status == Client.ProvisioningStatus.FAILED:
                     logger.info("Retrying previously failed provisioning for '%s' (key: %s)", existing.name, idempotency_key)
                     return cls.retry_provisioning(existing.id, owner_password)
@@ -95,8 +112,8 @@ class TenantProvisioningService:
                 provisioning_status=Client.ProvisioningStatus.PROVISIONING,
                 idempotency_key=idempotency_key
             )
-            # auto_create_schema=True ensures django-tenants handles CREATE SCHEMA & migrate_schemas
-            tenant.auto_create_schema = True
+            # When async_mode=True, do not run synchronous migrate_schemas inside save()
+            tenant.auto_create_schema = not async_mode
             tenant.save()
 
             Domain.objects.create(
@@ -105,88 +122,170 @@ class TenantProvisioningService:
                 is_primary=True
             )
 
-        # 3. Step 2 & 3: Provision and Seed within tenant schema
-        try:
-            with schema_context(schema_name):
-                # A. Showroom Branch
-                main_branch = Branch.objects.create(
-                    name="Main Showroom",
-                    address=address or "",
-                    phone=owner_phone or "",
-                    gstin=gstin or "",
-                    is_active=True
-                )
+        def _execute_pipeline():
+            try:
+                if async_mode:
+                    tenant.create_schema(check_if_exists=False, sync_schema=True)
 
-                # B. Owner User
-                owner = User(
-                    username=owner_username.strip(),
-                    email=owner_email or "",
-                    phone=owner_phone or "",
-                    role=User.Role.OWNER,
-                    branch=main_branch,
-                    is_staff=True,
-                    is_active=True
-                )
-                owner.set_password(owner_password)
-                owner.save()
+                with schema_context(schema_name):
+                    # A. Showroom Branch
+                    main_branch = Branch.objects.create(
+                        name="Main Showroom",
+                        address=address or "",
+                        phone=owner_phone or "",
+                        gstin=gstin or "",
+                        is_active=True
+                    )
 
-                # C. Categories
-                for cat_name in ["Gold Jewellery", "Silver Ornaments", "Diamond Jewellery", "Platinum"]:
-                    Category.objects.get_or_create(name=cat_name)
+                    # B. Owner User
+                    owner = User(
+                        username=owner_username.strip(),
+                        email=owner_email or "",
+                        phone=owner_phone or "",
+                        role=User.Role.OWNER,
+                        branch=main_branch,
+                        is_staff=True,
+                        is_active=True
+                    )
+                    owner.set_password(owner_password)
+                    owner.save()
 
-                # D. Standard Purities
-                default_purities = [
-                    ("24KT Pure Gold", Decimal('0.999')),
-                    ("22KT Hallmarked 916", Decimal('0.916')),
-                    ("18KT Diamond Studded", Decimal('0.750')),
-                    ("925 Sterling Silver", Decimal('0.925')),
-                ]
-                for p_name, fineness in default_purities:
-                    Purity.objects.get_or_create(name=p_name, defaults={'fineness': fineness})
+                    # C. Categories
+                    for cat_name in ["Gold Jewellery", "Silver Ornaments", "Diamond Jewellery", "Platinum"]:
+                        Category.objects.get_or_create(name=cat_name)
 
-                # E. Live Gold Rate Setting
-                ShopRateSetting.objects.get_or_create(
-                    branch=main_branch,
-                    defaults={'preferred_source': 'ksjf'}
-                )
+                    # D. Standard Purities
+                    default_purities = [
+                        ("24KT Pure Gold", Decimal('0.999')),
+                        ("22KT Hallmarked 916", Decimal('0.916')),
+                        ("18KT Diamond Studded", Decimal('0.750')),
+                        ("925 Sterling Silver", Decimal('0.925')),
+                    ]
+                    for p_name, fineness in default_purities:
+                        Purity.objects.get_or_create(name=p_name, defaults={'fineness': fineness})
 
-                # F. Verification Check: Confirm table and owner integrity
-                cls._validate_provisioning_integrity(schema_name, owner.id)
+                    # E. Live Gold Rate Setting
+                    ShopRateSetting.objects.get_or_create(
+                        branch=main_branch,
+                        defaults={'preferred_source': 'ksjf'}
+                    )
 
-                # G. Issue authoritative JWT tokens
-                owner.tenant_schema = schema_name
-                access_tok = create_token(owner, token_type='access')
-                refresh_tok = create_token(owner, token_type='refresh')
+                    # F. Verification Check: Confirm table and owner integrity
+                    cls._validate_provisioning_integrity(schema_name, owner.id)
 
-            # 4. Step 4: Promote to ACTIVE status
-            with schema_context('public'):
-                tenant.provisioning_status = Client.ProvisioningStatus.ACTIVE
-                tenant.is_active = True
-                tenant.provisioning_error = ""
-                tenant.save(update_fields=['provisioning_status', 'is_active', 'provisioning_error'])
+                    # G. Issue authoritative JWT tokens
+                    owner.tenant_schema = schema_name
+                    access_tok = create_token(owner, token_type='access')
+                    refresh_tok = create_token(owner, token_type='refresh')
 
-            logger.info("Store '%s' (%s) successfully provisioned and activated.", tenant.name, schema_name)
+                # Step 4: Promote to ACTIVE status
+                with schema_context('public'):
+                    tenant.provisioning_status = Client.ProvisioningStatus.ACTIVE
+                    tenant.is_active = True
+                    tenant.provisioning_error = ""
+                    tenant.save(update_fields=['provisioning_status', 'is_active', 'provisioning_error'])
+
+                logger.info("Store '%s' (%s) successfully provisioned and activated.", tenant.name, schema_name)
+                return {
+                    "schema_name": schema_name,
+                    "shop_name": tenant.name,
+                    "domain": domain_host,
+                    "owner_username": owner.username,
+                    "access": access_tok,
+                    "refresh": refresh_tok,
+                    "provisioning_status": Client.ProvisioningStatus.ACTIVE,
+                    "is_idempotent_replay": False,
+                    "message": f"Store '{tenant.name}' registered successfully with isolated database schema."
+                }
+
+            except Exception as exc:
+                logger.error("Provisioning failed for tenant '%s': %s", schema_name, exc, exc_info=True)
+                with schema_context('public'):
+                    tenant.provisioning_status = Client.ProvisioningStatus.FAILED
+                    tenant.provisioning_error = str(exc)
+                    tenant.retry_count += 1
+                    tenant.is_active = False
+                    tenant.save(update_fields=['provisioning_status', 'provisioning_error', 'retry_count', 'is_active'])
+                if not async_mode:
+                    raise RuntimeError(f"Tenant provisioning failed: {str(exc)}")
+            finally:
+                if async_mode:
+                    connection.close()
+
+        if async_mode:
+            thread = threading.Thread(target=_execute_pipeline, daemon=True)
+            thread.start()
             return {
                 "schema_name": schema_name,
                 "shop_name": tenant.name,
                 "domain": domain_host,
-                "owner_username": owner.username,
-                "access": access_tok,
-                "refresh": refresh_tok,
-                "provisioning_status": Client.ProvisioningStatus.ACTIVE,
+                "owner_username": owner_username.strip(),
+                "access": "",
+                "refresh": "",
+                "provisioning_status": Client.ProvisioningStatus.PROVISIONING,
                 "is_idempotent_replay": False,
-                "message": f"Store '{tenant.name}' registered successfully with isolated database schema."
+                "message": f"Store '{tenant.name}' provisioning initiated. Creating isolated database schema..."
             }
+        else:
+            return _execute_pipeline()
 
-        except Exception as exc:
-            logger.error("Provisioning failed for tenant '%s': %s", schema_name, exc, exc_info=True)
-            with schema_context('public'):
-                tenant.provisioning_status = Client.ProvisioningStatus.FAILED
-                tenant.provisioning_error = str(exc)
-                tenant.retry_count += 1
-                tenant.is_active = False
-                tenant.save(update_fields=['provisioning_status', 'provisioning_error', 'retry_count', 'is_active'])
-            raise RuntimeError(f"Tenant provisioning failed: {str(exc)}")
+    @classmethod
+    def get_provisioning_status(cls, schema_name: str) -> Dict[str, Any]:
+        """
+        Check the provisioning status of a tenant and issue credentials once active.
+        """
+        with schema_context('public'):
+            tenant = Client.objects.filter(schema_name=schema_name).first()
+            if not tenant:
+                return {
+                    "status": "not_found",
+                    "provisioning_status": "not_found",
+                    "error": "Store schema not found."
+                }
+
+            if tenant.provisioning_status == Client.ProvisioningStatus.ACTIVE:
+                with schema_context(schema_name):
+                    owner = User.objects.filter(role=User.Role.OWNER).first()
+                    if not owner:
+                        owner = User.objects.filter(is_superuser=True).first()
+                    if owner:
+                        owner.tenant_schema = schema_name
+                        access_tok = create_token(owner, token_type='access')
+                        refresh_tok = create_token(owner, token_type='refresh')
+                        owner_uname = owner.username
+                    else:
+                        access_tok = ""
+                        refresh_tok = ""
+                        owner_uname = ""
+
+                domain = getattr(tenant.domains.first(), 'domain', f"{schema_name}.swarnakhata.internal")
+                return {
+                    "status": "active",
+                    "provisioning_status": "active",
+                    "schema_name": schema_name,
+                    "shop_name": tenant.name,
+                    "domain": domain,
+                    "owner_username": owner_uname,
+                    "access": access_tok,
+                    "refresh": refresh_tok,
+                    "message": f"Store '{tenant.name}' is active and ready."
+                }
+            elif tenant.provisioning_status == Client.ProvisioningStatus.FAILED:
+                return {
+                    "status": "failed",
+                    "provisioning_status": "failed",
+                    "schema_name": schema_name,
+                    "shop_name": tenant.name,
+                    "error": tenant.provisioning_error or "Store provisioning encountered an error."
+                }
+            else:
+                return {
+                    "status": "provisioning",
+                    "provisioning_status": tenant.provisioning_status,
+                    "schema_name": schema_name,
+                    "shop_name": tenant.name,
+                    "message": "Store database schema provisioning in progress..."
+                }
 
     @classmethod
     def retry_provisioning(cls, tenant_id: int, owner_password: str) -> Dict[str, Any]:

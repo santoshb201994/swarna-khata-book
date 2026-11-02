@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, ArrowRight, ShieldCheck, Store, UserPlus, Building2, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Store, UserPlus, Building2, Eye, EyeOff, Mail, KeyRound, CheckCircle2, RotateCw } from 'lucide-react';
 import api from '../../api/client';
 import { PasswordPolicyChecklist } from '../../components/PasswordPolicyChecklist';
 import { validatePasswordPolicy } from '../../utils/passwordPolicy';
@@ -26,6 +26,21 @@ export const Login: React.FC = () => {
   const [regAddress, setRegAddress] = useState('');
   const [regGstin, setRegGstin] = useState('');
 
+  // Async Provisioning progress state
+  const [provisioningState, setProvisioningState] = useState<{
+    isProvisioning: boolean;
+    schemaName: string;
+    shopName: string;
+    progress: number;
+    message: string;
+  } | null>(null);
+
+  // Forgot Password modal fields
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -38,7 +53,7 @@ export const Login: React.FC = () => {
         err.response?.data?.error ||
         err.response?.data?.detail ||
         (err.code === 'ECONNABORTED' || err.message?.includes('timeout')
-          ? 'Backend server took too long to respond. The Render free tier instance may be waking up from sleep. Please wait 30 seconds and try again.'
+          ? 'Backend server took too long to respond. The instance may be waking up from sleep. Please wait 30 seconds and try again.'
           : err.message || 'Invalid username or password');
       toast.error(msg, { duration: 6000 });
     } finally {
@@ -46,10 +61,55 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim() || !forgotEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setForgotSubmitting(true);
+      await api.post('/auth/forgot-password/', { email: forgotEmail.trim() });
+      setForgotSent(true);
+      toast.success('Reset instructions sent to your email.');
+    } catch (err: any) {
+      // Always show generic message to prevent account enumeration
+      setForgotSent(true);
+      toast.success('If an account exists, instructions have been sent.');
+    } finally {
+      setForgotSubmitting(false);
+    }
+  };
+
+  const finishStoreLogin = async (
+    access: string,
+    refresh: string,
+    schemaName: string,
+    ownerUsername: string,
+    shopName: string
+  ) => {
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    localStorage.setItem('tenant_schema', schemaName);
+
+    try {
+      const meRes = await api.get('/auth/me');
+      localStorage.setItem('user_info', JSON.stringify(meRes.data));
+    } catch {
+      localStorage.setItem(
+        'user_info',
+        JSON.stringify({ username: ownerUsername, role: 'owner', tenant_schema: schemaName })
+      );
+    }
+
+    toast.success(`Store '${shopName}' provisioned successfully!`);
+    window.location.href = '/';
+  };
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Client-side validation
     if (!regShopName.trim()) {
       toast.error('Please enter your jewellery shop name');
       return;
@@ -78,48 +138,95 @@ export const Login: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      // Ensure no stale session or tenant context interferes with onboarding
+      // Clean slate before store registration
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('tenant_schema');
       localStorage.removeItem('user_info');
 
-      const res = await api.post(
-        '/tenants/register-store/',
-        {
-          shop_name: regShopName.trim(),
-          owner_username: regUsername.trim(),
-          owner_password: regPassword,
-          owner_email: regEmail.trim(),
-          owner_phone: regPhone.trim(),
-          address: regAddress.trim(),
-          gstin: regGstin.trim(),
-        },
-        {
-          timeout: 240000, // 4-minute timeout for multi-tenant schema creation & migrations on remote DB
-        }
-      );
+      const res = await api.post('/tenants/register-store/', {
+        shop_name: regShopName.trim(),
+        owner_username: regUsername.trim(),
+        owner_password: regPassword,
+        owner_email: regEmail.trim(),
+        owner_phone: regPhone.trim(),
+        address: regAddress.trim(),
+        gstin: regGstin.trim(),
+      });
 
-      const { access, refresh, schema_name } = res.data;
-      localStorage.setItem('access_token', access);
-      localStorage.setItem('refresh_token', refresh);
-      localStorage.setItem('tenant_schema', schema_name);
+      const { schema_name, provisioning_status, access, refresh } = res.data;
 
-      // Fetch user profile
-      try {
-        const meRes = await api.get('/auth/me');
-        localStorage.setItem('user_info', JSON.stringify(meRes.data));
-      } catch {
-        // fallback
-        localStorage.setItem(
-          'user_info',
-          JSON.stringify({ username: regUsername, role: 'owner' })
-        );
+      // If already active (e.g. fast sync or idempotent replay)
+      if (provisioning_status === 'active' && access) {
+        await finishStoreLogin(access, refresh, schema_name, regUsername, regShopName);
+        return;
       }
 
-      toast.success(`Store '${regShopName}' provisioned successfully!`);
-      window.location.href = '/';
+      // Start non-blocking polling state
+      setProvisioningState({
+        isProvisioning: true,
+        schemaName: schema_name,
+        shopName: regShopName.trim(),
+        progress: 20,
+        message: 'Creating isolated PostgreSQL schema...',
+      });
+
+      let attempts = 0;
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await api.get(`/tenants/status/${schema_name}/`);
+          const statusData = statusRes.data;
+
+          if (statusData.provisioning_status === 'active') {
+            clearInterval(pollInterval);
+            setProvisioningState((prev) =>
+              prev ? { ...prev, progress: 100, message: 'Store activated! Redirecting...' } : null
+            );
+            await finishStoreLogin(
+              statusData.access,
+              statusData.refresh,
+              schema_name,
+              regUsername,
+              regShopName
+            );
+          } else if (statusData.provisioning_status === 'failed') {
+            clearInterval(pollInterval);
+            setProvisioningState(null);
+            setIsSubmitting(false);
+            toast.error(statusData.error || 'Store provisioning failed.');
+          } else {
+            // Still in progress: animate progress indicator smoothly
+            const progressVal = Math.min(20 + attempts * 4, 94);
+            const stepMsg =
+              attempts > 18
+                ? 'Seeding default categories, purities, and gold rates...'
+                : attempts > 8
+                ? 'Applying multi-tenant database migrations...'
+                : 'Creating isolated PostgreSQL schema...';
+            setProvisioningState((prev) =>
+              prev ? { ...prev, progress: progressVal, message: stepMsg } : null
+            );
+          }
+        } catch (pollErr: any) {
+          if (pollErr.response?.data?.provisioning_status === 'failed') {
+            clearInterval(pollInterval);
+            setProvisioningState(null);
+            setIsSubmitting(false);
+            toast.error(pollErr.response?.data?.error || 'Store provisioning encountered an issue.');
+          }
+        }
+
+        if (attempts >= 90) { // 3.5 minutes max
+          clearInterval(pollInterval);
+          setProvisioningState(null);
+          setIsSubmitting(false);
+          toast.error('Provisioning is taking longer than usual. Please try logging in with your owner credentials in a moment.');
+        }
+      }, 2500);
+
     } catch (err: any) {
+      setIsSubmitting(false);
       let msg = 'Failed to register new store';
       if (err.response?.data?.error) {
         msg = err.response.data.error;
@@ -129,14 +236,10 @@ export const Login: React.FC = () => {
         } else if (typeof err.response.data.detail === 'string') {
           msg = err.response.data.detail;
         }
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        msg = 'Database schema provisioning is taking longer than expected. Please wait a moment and try logging in, or try again.';
       } else if (err.message) {
         msg = err.message;
       }
       toast.error(msg, { duration: 8000 });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -154,37 +257,143 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {/* Two Store Persona Selector Tabs */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setActivePersona('store_login')}
-            className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 ${
-              activePersona === 'store_login'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5 text-amber-600" />
-            <span className="truncate">Store Sign In</span>
-          </button>
+        {/* Persona Selector Tabs */}
+        {!provisioningState && !showForgotPassword && (
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActivePersona('store_login')}
+              className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activePersona === 'store_login'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5 text-amber-600" />
+              <span className="truncate">Store Sign In</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActivePersona('register_store')}
-            className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 ${
-              activePersona === 'register_store'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5 text-amber-600" />
-            <span className="truncate">Register Store</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setActivePersona('register_store')}
+              className={`py-2 px-1 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activePersona === 'register_store'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+              <span className="truncate">Register Store</span>
+            </button>
+          </div>
+        )}
+
+        {/* Forgot Password View */}
+        {showForgotPassword && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-base">
+              <KeyRound className="w-5 h-5 text-amber-600" />
+              <span>Reset Your Store Password</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Enter your registered account email. If the email exists in our system, we will send you a secure, single-use reset link via Brevo transactional email.
+            </p>
+
+            {forgotSent ? (
+              <div className="space-y-4 text-center py-4">
+                <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">Email Dispatched</h4>
+                <p className="text-xs text-slate-600">
+                  If an account is associated with <b>{forgotEmail}</b>, you will receive password reset instructions shortly. Please check your inbox and spam folder.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotSent(false);
+                    setForgotEmail('');
+                  }}
+                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+                >
+                  Return to Sign In
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Registered Email Address *
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                      placeholder="owner@jewellers.com"
+                      autoFocus
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotEmail('');
+                    }}
+                    className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={forgotSubmitting}
+                    className="w-1/2 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl text-xs shadow-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {forgotSubmitting ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* Live Provisioning Progress Card */}
+        {provisioningState && (
+          <div className="p-6 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center shrink-0">
+                <RotateCw className="w-5 h-5 text-amber-600 animate-spin" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Provisioning '{provisioningState.shopName}'</h4>
+                <p className="text-xs text-amber-900 font-medium">{provisioningState.message}</p>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-amber-200/60 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-amber-500 to-amber-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${provisioningState.progress}%` }}
+              ></div>
+            </div>
+
+            <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+              <span>PostgreSQL Schema: <code className="font-bold text-slate-700">{provisioningState.schemaName}</code></span>
+              <span>{provisioningState.progress}% complete</span>
+            </div>
+          </div>
+        )}
 
         {/* Store Sign In Form */}
-        {activePersona === 'store_login' && (
+        {!showForgotPassword && !provisioningState && activePersona === 'store_login' && (
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
@@ -203,16 +412,25 @@ export const Login: React.FC = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
-                placeholder="e.g. owner or ramesh_sales"
+                placeholder="e.g. owner or admin"
                 autoComplete="username"
                 autoFocus
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-xs text-amber-700 hover:text-amber-800 font-semibold cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative flex items-center">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -226,7 +444,7 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-slate-400 hover:text-slate-600 focus:outline-hidden cursor-pointer p-1"
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
                   title={showPassword ? 'Hide password' : 'Show password'}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -242,25 +460,36 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl shadow-md transition transform active:scale-98 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl shadow-md transition transform active:scale-98 disabled:opacity-50 cursor-pointer"
             >
-              <span>{isSubmitting ? 'Signing in (connecting to backend)...' : 'Sign In to Store'}</span>
+              <span>{isSubmitting ? 'Signing in...' : 'Sign In to Store'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-900">
-              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>
-                <b>Demo Accounts:</b> Admin: <code className="font-bold">admin</code> /{' '}
-                <code className="font-bold">admin123</code> | Cashier:{' '}
-                <code className="font-bold">cashier</code>
-              </span>
+            {/* Single Temporary Test Account Helper */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-700">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <b>Test Account:</b> <code className="font-bold bg-slate-200 px-1 py-0.5 rounded text-slate-800">admin</code> / <code className="font-bold bg-slate-200 px-1 py-0.5 rounded text-slate-800">admin123</code>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUsername('admin');
+                  setPassword('admin123');
+                }}
+                className="text-amber-700 hover:text-amber-800 font-bold underline cursor-pointer text-xs ml-2"
+              >
+                Auto Fill
+              </button>
             </div>
           </form>
         )}
 
-        {/* Persona 2: Self-Service Store Registration Form */}
-        {activePersona === 'register_store' && (
+        {/* Self-Service Store Registration Form */}
+        {!showForgotPassword && !provisioningState && activePersona === 'register_store' && (
           <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
             <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-700 shrink-0" />
@@ -341,7 +570,7 @@ export const Login: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowRegPassword(!showRegPassword)}
-                    className="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-hidden cursor-pointer p-1"
+                    className="absolute right-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
                     title={showRegPassword ? 'Hide password' : 'Show password'}
                     aria-label={showRegPassword ? 'Hide password' : 'Show password'}
                   >
@@ -389,9 +618,9 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 mt-2"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 mt-2 cursor-pointer"
             >
-              <span>{isSubmitting ? 'Provisioning Store & Schema...' : 'Create Jewellery Store Account'}</span>
+              <span>{isSubmitting ? 'Starting Store Provisioning...' : 'Create Jewellery Store Account'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

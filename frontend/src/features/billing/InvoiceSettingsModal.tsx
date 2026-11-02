@@ -132,7 +132,7 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
         onSettingsUpdated(res.data);
       }
     } catch (err: any) {
-      toast.error('Failed to reset demo invoice settings.');
+      toast.error('Failed to reset reference invoice settings.');
     } finally {
       setIsSaving(false);
     }

@@ -6,6 +6,7 @@ import { POSScreen } from './features/billing/POSScreen';
 import { ProductList } from './features/products/ProductList';
 import { AccountingDashboard } from './features/accounting/AccountingDashboard';
 import { Login } from './features/auth/Login';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { MobileScannerPage } from './features/scanner/MobileScannerPage';
 import { DeveloperPortal } from './features/developer/DeveloperPortal';
 import { canAccessFeature, type WebappFeature } from './utils/rbac';
@@ -36,6 +37,7 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/developer" element={<DeveloperPortal />} />
           <Route path="/scanner" element={<MobileScannerPage />} />
           <Route

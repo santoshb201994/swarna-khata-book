@@ -115,6 +115,36 @@ class PasswordChangeIn(BaseModel):
         return v
 
 
+class ForgotPasswordIn(BaseModel):
+    email: str
+
+    @field_validator('email')
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if '@' not in clean or '.' not in clean.split('@')[-1]:
+            raise ValueError('Please provide a valid email address.')
+        return clean
+
+
+class VerifyResetTokenIn(BaseModel):
+    token: str
+
+
+class PublicPasswordResetIn(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_pwd(cls, v: str) -> str:
+        try:
+            validate_password_policy(v)
+        except DjangoValidationError as exc:
+            raise ValueError(exc.messages[0])
+        return v
+
+
 class StaffStatusUpdateIn(BaseModel):
     is_active: bool
 

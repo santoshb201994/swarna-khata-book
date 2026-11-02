@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "backend/config/settings.py": {
-    "mtime": 1793550872.7407343,
-    "seen": 1793550880.032036,
-    "ast_hash": "6e6585e4e083b658c7b5ebdca6f6999c",
+    "mtime": 1793632137.519496,
+    "seen": 1793632145.609108,
+    "ast_hash": "6a1a618309daed101f51daa6a9d33f53",
     "semantic_hash": ""
   },
   "backend/config/urls.py": {
@@ -324,9 +324,9 @@
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
-    "mtime": 1793112600.8632724,
-    "seen": 1793112608.1299338,
-    "ast_hash": "4ed417f47035afb3b0d0f2aa491692ef",
+    "mtime": 1793632459.3076591,
+    "seen": 1793632460.8010745,
+    "ast_hash": "39c90c6661a7299357e5aa22dbb05580",
     "semantic_hash": ""
   },
   "frontend/src/api/client.ts": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/auth/Login.tsx": {
-    "mtime": 1793562936.8186638,
-    "seen": 1793562944.9601576,
-    "ast_hash": "aa9a1fce008a2d0b2161b2fec1f92471",
+    "mtime": 1793632520.9388123,
+    "seen": 1793632529.30134,
+    "ast_hash": "5ca2bddb36d5d377fcf470a029e78a94",
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/models.py": {
-    "mtime": 1793550478.0527773,
-    "seen": 1793550486.2270622,
-    "ast_hash": "b6619023231b4f624ecf186757bb30a7",
+    "mtime": 1793631958.5049987,
+    "seen": 1793631967.2873733,
+    "ast_hash": "05faf26e93c3784a24c003e81262f8d5",
     "semantic_hash": ""
   },
   "backend/apps/tenants/admin.py": {
@@ -612,9 +612,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
-    "mtime": 1793550660.314043,
-    "seen": 1793550668.5896206,
-    "ast_hash": "80daf7166d80f058c8a27ef3a8e0edb8",
+    "mtime": 1793632172.3032596,
+    "seen": 1793632180.3614986,
+    "ast_hash": "61e67bb9275b9e71312929a015daae4b",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/__init__.py": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/auth_router.py": {
-    "mtime": 1793546540.6172392,
-    "seen": 1793546548.6633792,
-    "ast_hash": "a6be733c72b6535c73c1ab3c799311ff",
+    "mtime": 1793632216.8746395,
+    "seen": 1793632225.0185478,
+    "ast_hash": "95487bfd4cb7c8fa69140c0c06b52f9a",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
-    "mtime": 1793562920.6664104,
-    "seen": 1793562928.0092182,
-    "ast_hash": "03e3c652cc8cbd5f99a8886dd0faedab",
+    "mtime": 1793632396.379308,
+    "seen": 1793632404.9606102,
+    "ast_hash": "ca7a4efa04021fcc81fd6d1978d76c86",
     "semantic_hash": ""
   },
   "backend/ninja_api/api.py": {
@@ -894,9 +894,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/billing/InvoiceSettingsModal.tsx": {
-    "mtime": 1792936590.3347836,
-    "seen": 1792936598.8818467,
-    "ast_hash": "f5093c10e63c736bb18db925f6585647",
+    "mtime": 1793632556.7257686,
+    "seen": 1793632564.3967907,
+    "ast_hash": "78c02d91c1bce95cefe654e0666fba80",
     "semantic_hash": ""
   },
   "frontend/src/utils/invoiceDownload.ts": {
@@ -1152,9 +1152,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/provisioning.py": {
-    "mtime": 1793562909.8815002,
-    "seen": 1793562918.1614337,
-    "ast_hash": "14461001f297c1ed2f2d6b6adf30a7ff",
+    "mtime": 1793632344.5190933,
+    "seen": 1793632352.6787033,
+    "ast_hash": "30e28c3019a361eb831aa28dca3947d5",
     "semantic_hash": ""
   },
   "backend/apps/tenants/migrator.py": {
@@ -1197,6 +1197,54 @@
     "mtime": 1793552379.514136,
     "seen": 1793552387.45487,
     "ast_hash": "048137125b2cda958bd5799dec54e8c7",
+    "semantic_hash": ""
+  },
+  "backend/apps/tenants/migrations/0003_passwordresettoken.py": {
+    "mtime": 1793631971.8609467,
+    "seen": 1793631980.0989428,
+    "ast_hash": "597ff4a4d44a25e59ed5bf7f37466e2d",
+    "semantic_hash": ""
+  },
+  "backend/apps/emails/__init__.py": {
+    "mtime": 1793632056.6895363,
+    "seen": 1793632064.7007422,
+    "ast_hash": "717c0db6acf5635dbfa52a60bb33acc9",
+    "semantic_hash": ""
+  },
+  "backend/apps/emails/templates.py": {
+    "mtime": 1793632081.6640916,
+    "seen": 1793632089.8807056,
+    "ast_hash": "35e80c6707dac1330619cb16c67ce7d3",
+    "semantic_hash": ""
+  },
+  "backend/apps/emails/provider.py": {
+    "mtime": 1793632112.6453073,
+    "seen": 1793632120.7281716,
+    "ast_hash": "f2f6ec1ee941b9826d76823f7447f170",
+    "semantic_hash": ""
+  },
+  "backend/apps/emails/service.py": {
+    "mtime": 1793632124.7038696,
+    "seen": 1793632133.121167,
+    "ast_hash": "71121b62d87ea67a53d04c54f5aebb89",
+    "semantic_hash": ""
+  },
+  "backend/apps/emails/apps.py": {
+    "mtime": 1793632143.8194542,
+    "seen": 1793632152.2396004,
+    "ast_hash": "4fcf5b3aea893a6b90c1d6db7046a2fc",
+    "semantic_hash": ""
+  },
+  "frontend/src/features/auth/ResetPasswordPage.tsx": {
+    "mtime": 1793632573.0703712,
+    "seen": 1793632580.9548397,
+    "ast_hash": "1beef1bddcecd6c779dc75f20dd7c789",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_brevo_password_reset.py": {
+    "mtime": 1793633156.878038,
+    "seen": 1793633164.4086506,
+    "ast_hash": "e4d5204515d793ab051a2a5a020b7d18",
     "semantic_hash": ""
   }
 }

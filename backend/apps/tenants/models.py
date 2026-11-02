@@ -47,3 +47,33 @@ class Domain(DomainMixin):
     Domain routing model mapping hostnames/subdomains to tenants.
     """
     pass
+
+
+class PasswordResetToken(models.Model):
+    """
+    Secure, single-use, expiring password-reset token registry.
+    Stored exclusively in the public schema to support multi-tenant user resolution.
+    Raw tokens are never stored; only cryptographic SHA-256 hashes are persisted.
+    """
+    user_id = models.IntegerField(db_index=True)
+    user_email = models.EmailField(db_index=True)
+    tenant_schema = models.CharField(max_length=63, default='public', db_index=True)
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token_hash', 'expires_at']),
+            models.Index(fields=['user_email', 'tenant_schema']),
+        ]
+
+    def is_valid(self) -> bool:
+        from django.utils import timezone
+        return self.used_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"ResetToken({self.user_email} @ {self.tenant_schema}, valid={self.is_valid()})"

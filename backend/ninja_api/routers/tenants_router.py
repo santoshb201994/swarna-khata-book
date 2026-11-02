@@ -40,6 +40,7 @@ def register_store(request, payload: StoreRegistrationIn):
     effective_idempotency_key = (payload.idempotency_key or header_idempotency or "").strip() or None
 
     try:
+        # Non-blocking async provisioning to prevent gateway timeouts on remote migrations
         result = TenantProvisioningService.provision_store(
             shop_name=payload.shop_name,
             owner_username=payload.owner_username,
@@ -48,11 +49,27 @@ def register_store(request, payload: StoreRegistrationIn):
             owner_phone=payload.owner_phone,
             address=payload.address,
             gstin=payload.gstin,
-            idempotency_key=effective_idempotency_key
+            idempotency_key=effective_idempotency_key,
+            async_mode=True
         )
         return 201, result
     except Exception as exc:
         return 400, {"error": f"Failed to register store: {str(exc)}"}
+
+
+@router.get("/tenants/status/{schema_name}/", response={200: dict, 400: dict, 404: dict}, auth=None)
+def get_store_provisioning_status(request, schema_name: str):
+    """
+    Poll status of an asynchronous store provisioning pipeline.
+    Returns access & refresh tokens immediately when the store schema becomes active.
+    """
+    res = TenantProvisioningService.get_provisioning_status(schema_name)
+    status = res.get("status")
+    if status == "not_found":
+        return 404, res
+    elif status == "failed":
+        return 400, res
+    return 200, res
 
 
 def _format_tenant(t: Client) -> dict:

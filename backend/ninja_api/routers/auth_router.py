@@ -13,7 +13,8 @@ from ninja_api.auth import create_token, decode_token, jwt_auth, require_role, R
 from ninja_api.schemas import (
     TokenRequest, TokenRefreshRequest, TokenResponse, UserInfo,
     UserCreateIn, UserDetailOut, BranchIn, BranchOut,
-    PasswordResetIn, PasswordChangeIn, StaffStatusUpdateIn
+    PasswordResetIn, PasswordChangeIn, StaffStatusUpdateIn,
+    ForgotPasswordIn, VerifyResetTokenIn, PublicPasswordResetIn
 )
 
 router = Router(tags=["Authentication & Account Management"])
@@ -358,3 +359,185 @@ def update_branch(request, branch_id: int, payload: BranchIn):
     branch.is_active = payload.is_active
     branch.save()
     return branch
+
+
+# ==============================================================================
+# FORGOT & RESET PASSWORD (BREVO TRANSACTIONAL EMAIL INTEGRATION)
+# ==============================================================================
+
+def _find_user_by_email(email: str):
+    """
+    Search for an active user across schemas (public platform, then active store tenants).
+    Returns (User, schema_name, shop_name) or (None, None, None).
+    """
+    from apps.tenants.models import Client
+    from django_tenants.utils import schema_context
+    clean_email = email.strip().lower()
+
+    # 1. Search public schema
+    with schema_context('public'):
+        u = User.objects.filter(email__iexact=clean_email, is_active=True).first()
+        if u:
+            return u, 'public', 'Swarna Khata Platform'
+
+    # 2. Search active store tenants
+    for client in Client.objects.filter(is_active=True).exclude(schema_name='public'):
+        with schema_context(client.schema_name):
+            u = User.objects.filter(email__iexact=clean_email, is_active=True).first()
+            if u:
+                return u, client.schema_name, client.name
+
+    return None, None, None
+
+
+@router.post("/auth/forgot-password/", response={200: dict}, auth=None)
+def request_password_reset(request, payload: ForgotPasswordIn):
+    """
+    Initiate self-service password reset via Brevo transactional email.
+    Generates a secure, single-use, 15-minute expiring token.
+    Always returns a generic 200 response to eliminate account enumeration attacks.
+    """
+    import secrets
+    import hashlib
+    from datetime import timedelta
+    from django.utils import timezone
+    from django_tenants.utils import schema_context
+    from apps.tenants.models import PasswordResetToken
+    from apps.emails.service import EmailService
+
+    clean_email = payload.email.strip().lower()
+    client_ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR')
+    generic_response = {
+        "message": "If an account with that email exists, password reset instructions have been sent."
+    }
+
+    # Rate limiting cooldown check (3 minutes per email)
+    with schema_context('public'):
+        recent_token = PasswordResetToken.objects.filter(
+            user_email__iexact=clean_email,
+            created_at__gte=timezone.now() - timedelta(minutes=3)
+        ).first()
+
+    if recent_token:
+        audit_logger.warning("FORGOT_PASSWORD_RATE_LIMITED: email='%s' ip='%s'", clean_email, client_ip)
+        return 200, generic_response
+
+    # Resolve user across schemas
+    target_user, target_schema, shop_name = _find_user_by_email(clean_email)
+    if not target_user:
+        audit_logger.info("FORGOT_PASSWORD_EMAIL_NOT_FOUND: email='%s' ip='%s'", clean_email, client_ip)
+        return 200, generic_response
+
+    # Generate cryptographically secure token & SHA-256 hash
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+
+    with schema_context('public'):
+        # Invalidate any existing unused tokens for this user
+        PasswordResetToken.objects.filter(
+            user_email__iexact=clean_email,
+            used_at__isnull=True
+        ).update(used_at=timezone.now())
+
+        # Store hashed token with 15-minute expiration
+        PasswordResetToken.objects.create(
+            user_id=target_user.id,
+            user_email=clean_email,
+            tenant_schema=target_schema,
+            token_hash=token_hash,
+            expires_at=timezone.now() + timedelta(minutes=15),
+            ip_address=client_ip
+        )
+
+    # Dispatch email asynchronously via Brevo / configured provider
+    EmailService.send_password_reset_email(
+        user_id=target_user.id,
+        username=target_user.username,
+        email=clean_email,
+        tenant_schema=target_schema,
+        raw_token=raw_token,
+        shop_name=shop_name,
+        ip_address=client_ip
+    )
+
+    return 200, generic_response
+
+
+@router.post("/auth/verify-reset-token/", response={200: dict, 400: dict}, auth=None)
+def verify_reset_token(request, payload: VerifyResetTokenIn):
+    """
+    Verify whether a password reset token is valid and unexpired before presenting the reset form.
+    """
+    import hashlib
+    from django_tenants.utils import schema_context
+    from apps.tenants.models import PasswordResetToken
+
+    token_hash = hashlib.sha256(payload.token.strip().encode('utf-8')).hexdigest()
+
+    with schema_context('public'):
+        token_obj = PasswordResetToken.objects.filter(token_hash=token_hash).first()
+        if not token_obj or not token_obj.is_valid():
+            return 400, {
+                "valid": False,
+                "error": "This password reset link is invalid or has expired. Please request a new one."
+            }
+
+        return 200, {
+            "valid": True,
+            "email": token_obj.user_email,
+            "tenant_schema": token_obj.tenant_schema
+        }
+
+
+@router.post("/auth/reset-password/", response={200: dict, 400: dict}, auth=None)
+def complete_password_reset(request, payload: PublicPasswordResetIn):
+    """
+    Redeem password reset token and update user credentials.
+    Enforces Jewellery Shield password policy, single-use token consumption,
+    and audit logging.
+    """
+    import hashlib
+    from django.utils import timezone
+    from django_tenants.utils import schema_context
+    from apps.tenants.models import PasswordResetToken
+
+    token_hash = hashlib.sha256(payload.token.strip().encode('utf-8')).hexdigest()
+    client_ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR')
+
+    with schema_context('public'):
+        token_obj = PasswordResetToken.objects.filter(token_hash=token_hash).first()
+        if not token_obj or not token_obj.is_valid():
+            audit_logger.warning("PASSWORD_RESET_INVALID_TOKEN: ip='%s'", client_ip)
+            return 400, {
+                "error": "This password reset link is invalid or has expired. Please request a new one."
+            }
+
+        # Save target details before consuming token
+        target_schema = token_obj.tenant_schema
+        target_user_id = token_obj.user_id
+
+    # Update user password in target schema
+    with schema_context(target_schema):
+        target_user = User.objects.filter(id=target_user_id).first()
+        if not target_user or not target_user.is_active:
+            audit_logger.warning("PASSWORD_RESET_USER_MISSING: user_id=%s schema=%s", target_user_id, target_schema)
+            return 400, {"error": "User account could not be found or has been disabled."}
+
+        target_user.set_password(payload.new_password)
+        target_user.save(update_fields=['password'])
+
+    # Single-use: Mark token as consumed
+    with schema_context('public'):
+        token_obj.used_at = timezone.now()
+        token_obj.save(update_fields=['used_at'])
+
+    audit_logger.info(
+        "PASSWORD_RESET_SUCCESS: user_id=%d username='%s' schema='%s' ip='%s'",
+        target_user.id, target_user.username, target_schema, client_ip
+    )
+
+    return 200, {
+        "success": True,
+        "message": "Your password has been successfully reset. You may now sign in."
+    }
+

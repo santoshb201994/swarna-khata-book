@@ -65,6 +65,7 @@ SHARED_APPS = (
     'django.contrib.staticfiles',
     'corsheaders',
     'apps.accounts',  # Shared to resolve AUTH_USER_MODEL
+    'apps.emails',
 )
 
 # Apps executed on each TENANT schema (tenant-isolated business data)
