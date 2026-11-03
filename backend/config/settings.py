@@ -136,6 +136,15 @@ active_db_url = (DATABASE_MIGRATION_URL if is_running_migration and DATABASE_MIG
 
 if active_db_url:
     active_db_url = active_db_url.strip().strip("'").strip('"')
+    
+    # CRITICAL: Neon PgBouncer transaction-mode pooler (-pooler) resets PostgreSQL session state
+    # (`SET search_path`) between transactions. Because django-tenants relies exclusively on session search_path
+    # for tenant isolation and migration execution, connecting via transaction pooler causes queries to randomly
+    # drop back to 'public' and fail with 'relation "products_category" does not exist'.
+    # We automatically sanitize Neon URLs to the direct compute endpoint.
+    if '-pooler' in active_db_url:
+        active_db_url = active_db_url.replace('-pooler', '')
+
     tmpPostgres = urlparse(active_db_url)
     is_pooled = '-pooler' in (tmpPostgres.hostname or '')
     # In PgBouncer transaction pooling, CONN_MAX_AGE must be 0 to prevent cross-request session leakage

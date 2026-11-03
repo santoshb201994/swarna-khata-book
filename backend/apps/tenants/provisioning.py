@@ -124,8 +124,14 @@ class TenantProvisioningService:
 
         def _execute_pipeline():
             try:
+                from django_tenants.utils import schema_exists
+                from django.core.management import call_command
+
                 if async_mode:
-                    tenant.create_schema(check_if_exists=False, sync_schema=True)
+                    if schema_exists(schema_name):
+                        call_command('migrate_schemas', tenant=True, schema_name=schema_name, interactive=False, verbosity=0)
+                    else:
+                        tenant.create_schema(check_if_exists=False, sync_schema=True)
 
                 with schema_context(schema_name):
                     # A. Showroom Branch
@@ -292,15 +298,27 @@ class TenantProvisioningService:
         """
         Retries a failed tenant provisioning pipeline.
         """
+        from django_tenants.utils import schema_exists
+        from django.core.management import call_command
+
         with schema_context('public'):
             tenant = Client.objects.filter(id=tenant_id).first()
             if not tenant:
                 raise ValueError("Tenant not found.")
             tenant.retry_count += 1
-            tenant.save(update_fields=['retry_count'])
+            tenant.provisioning_status = Client.ProvisioningStatus.PROVISIONING
+            tenant.provisioning_error = ""
+            tenant.save(update_fields=['retry_count', 'provisioning_status', 'provisioning_error'])
 
         # Execute provisioning steps inside schema
         schema_name = tenant.schema_name
+
+        # Ensure schema exists and migrations are completely applied
+        if schema_exists(schema_name):
+            call_command('migrate_schemas', tenant=True, schema_name=schema_name, interactive=False, verbosity=0)
+        else:
+            tenant.create_schema(check_if_exists=False, sync_schema=True)
+
         with schema_context(schema_name):
             # Check or create branch
             branch, _ = Branch.objects.get_or_create(name="Main Showroom", defaults={'is_active': True})
@@ -327,6 +345,12 @@ class TenantProvisioningService:
             ]
             for p_name, fineness in default_purities:
                 Purity.objects.get_or_create(name=p_name, defaults={'fineness': fineness})
+
+            # Live Gold Rate Setting
+            ShopRateSetting.objects.get_or_create(
+                branch=branch,
+                defaults={'preferred_source': 'ksjf'}
+            )
 
             cls._validate_provisioning_integrity(schema_name, owner.id)
             owner.tenant_schema = schema_name

@@ -1,7 +1,7 @@
-# Graph Report - swarna_khata_book  (2026-11-02)
+# Graph Report - swarna_khata_book  (2026-11-03)
 
 ## Corpus Check
-- 201 files · ~99,853 words
+- 201 files · ~99,986 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .bat 3, .css 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `55a11d88`
+- Built from commit: `926de6e7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -388,7 +388,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `products_router.py` be split into smaller, more focused modules?**
   _Cohesion score 0.07557354925775979 - nodes in this community are weakly interconnected._
 - **Why does `User` connect `User` to `export_tenant_data_to_zip`, `NinjaPOSBillingTestCase`, `Client`, `InvoiceSettingsTestCase`, `validate_password_policy`, `MultiSourceGoldRateScraperTestCase`, `bills_router.py`, `auth_router.py`, `create_token`, `DayBookAccountingTestCase`, `TrayQRTagsTestCase`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `Purity`, `tenants_router.py`, `resolver.py`, `DataExportTestCase`, `BrevoPasswordResetIntegrationTestCase`, `list_users`, `ProductionHardeningArchitectureTestCase`, `Product`, `JWTAuth`, `NinjaProductsStockTestCase`?**
-  _High betweenness centrality (0.051) - this node is a cross-community bridge._
+  _High betweenness centrality (0.050) - this node is a cross-community bridge._
 - **Are the 38 inferred relationships involving `User` (e.g. with `TenantBackupService` and `export_tenant_data_to_zip()`) actually correct?**
   _`User` has 38 INFERRED edges - model-reasoned connections that need verification._
 - **Should `qr_tags_router.py` be split into smaller, more focused modules?**
