@@ -26,10 +26,17 @@ if not public_tenant:
     print("Created public tenant.")
 
 with schema_context('public'):
+    from django.conf import settings
+    from django.db import connection
+
+    dev_username = getattr(settings, 'DEVELOPER_SUPERUSER_USERNAME', 'developer')
+    dev_password = getattr(settings, 'DEVELOPER_SUPERUSER_PASSWORD', 'Super*Vault9')
+    dev_email = getattr(settings, 'DEVELOPER_SUPERUSER_EMAIL', 'developer@swarnakhata.internal')
+
     dev_user, _ = User.objects.get_or_create(
-        username="dev_superadmin",
+        username=dev_username,
         defaults={
-            "email": "dev@swarnakhata.internal",
+            "email": dev_email,
             "first_name": "Platform",
             "last_name": "Developer",
             "role": "superadmin",
@@ -37,48 +44,15 @@ with schema_context('public'):
             "is_superuser": True,
         }
     )
-    dev_user.set_password("Super*Vault9")
+    dev_user.set_password(dev_password)
     dev_user.role = "superadmin"
     dev_user.is_staff = True
     dev_user.is_superuser = True
     dev_user.save()
 
-    dev_alias, _ = User.objects.get_or_create(
-        username="developer",
-        defaults={
-            "email": "developer@swarnakhata.internal",
-            "first_name": "Platform",
-            "last_name": "Developer",
-            "role": "superadmin",
-            "is_staff": True,
-            "is_superuser": True,
-        }
-    )
-    dev_alias.set_password("Super*Vault9")
-    dev_alias.role = "superadmin"
-    dev_alias.is_staff = True
-    dev_alias.is_superuser = True
-    dev_alias.save()
-
-    dev_admin, _ = User.objects.get_or_create(
-        username="admin",
-        defaults={
-            "email": "admin@swarnakhata.internal",
-            "first_name": "Platform",
-            "last_name": "Developer",
-            "role": "superadmin",
-            "is_staff": True,
-            "is_superuser": True,
-        }
-    )
-    dev_admin.set_password("admin123")
-    dev_admin.role = "superadmin"
-    dev_admin.is_staff = True
-    dev_admin.is_superuser = True
-    dev_admin.save()
-
-    User.objects.exclude(username__in=["dev_superadmin", "developer", "admin"]).delete()
-    print("Configured platform developer superadmin account in public schema.")
+    with connection.cursor() as cur:
+        cur.execute('DELETE FROM accounts_user WHERE username != %s', [dev_username])
+    print(f"Configured single platform developer superadmin account '{dev_username}' in public schema.")
 
 demo_tenant = Client.objects.filter(schema_name='demo').first()
 if not demo_tenant:

@@ -224,9 +224,8 @@ class TenantResolver:
         # 3c. Safe Fallback for Store APIs
         if not tenant:
             if not cls.is_exempt_path(request.path):
-                # Auto-route to active demo or primary store tenant for store frontend
+                # Auto-route to active registered store tenant for store frontend
                 fallback = (
-                    tenant_model.objects.filter(schema_name='demo', is_active=True).first() or
                     tenant_model.objects.exclude(schema_name=public_schema).filter(is_active=True).first()
                 )
                 if fallback:

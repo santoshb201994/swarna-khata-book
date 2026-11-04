@@ -141,28 +141,73 @@ def create_tenant(request, payload: TenantCreateIn):
 def developer_login(request, payload: TokenRequest):
     """
     Dedicated endpoint for Developer / Superadmin authentication.
-    Always authenticates directly against the public schema with superadmin validation.
+    Only the single designated superuser configured in backend .env can authenticate.
+    Password can only be modified via backend code in local .env.
     """
+    from django.conf import settings
+    from django.db import connection
     from django.contrib.auth import authenticate
+
+    expected_username = getattr(settings, 'DEVELOPER_SUPERUSER_USERNAME', 'developer')
+    expected_password = getattr(settings, 'DEVELOPER_SUPERUSER_PASSWORD', 'Super*Vault9')
+    expected_email = getattr(settings, 'DEVELOPER_SUPERUSER_EMAIL', 'developer@swarnakhata.internal')
+
+    submitted_username = (payload.username or '').strip()
+    submitted_password = payload.password or ''
+
+    # Strictly reject any account other than the single configured developer superuser
+    if submitted_username != expected_username:
+        return 401, {"error": "Invalid developer credentials."}
+
     with schema_context('public'):
-        user = authenticate(request, username=payload.username, password=payload.password)
-        if not user or not user.is_active:
+        # Ensure the single developer account exists in the public schema
+        user, created = User.objects.get_or_create(
+            username=expected_username,
+            defaults={
+                "email": expected_email,
+                "first_name": "Platform",
+                "last_name": "Developer",
+                "role": "superadmin",
+                "is_staff": True,
+                "is_superuser": True,
+            }
+        )
+
+        # Synchronize password from local .env if changed in backend code / .env
+        if not user.check_password(expected_password) or created or not user.is_superuser or user.role != 'superadmin':
+            user.set_password(expected_password)
+            user.role = 'superadmin'
+            user.is_staff = True
+            user.is_superuser = True
+            user.is_active = True
+            user.save()
+
+        # Enforce strictly only ONE superuser in public schema by deleting any other entries
+        with connection.cursor() as cur:
+            cur.execute('DELETE FROM accounts_user WHERE username != %s', [expected_username])
+
+        # Authenticate with submitted credentials
+        authenticated_user = authenticate(request, username=submitted_username, password=submitted_password)
+        if not authenticated_user or not authenticated_user.is_active:
             return 401, {"error": "Invalid developer credentials."}
-        if not (user.is_superuser or user.role == 'superadmin'):
+        if not (authenticated_user.is_superuser or authenticated_user.role == 'superadmin'):
             return 403, {"error": "Access denied: Account is not a platform superadmin."}
 
-        user.role = 'superadmin'
-        access_token = create_token(user, token_type='access')
-        refresh_token = create_token(user, token_type='refresh')
+        authenticated_user.role = 'superadmin'
+        authenticated_user.tenant_schema = 'public'
+        access_token = create_token(authenticated_user, token_type='access')
+        refresh_token = create_token(authenticated_user, token_type='refresh')
         return 200, {
             "access": access_token,
             "refresh": refresh_token,
+            "tenant_schema": "public",
             "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
+                "id": authenticated_user.id,
+                "username": authenticated_user.username,
+                "email": authenticated_user.email,
                 "role": "superadmin",
-                "branch_id": user.branch_id,
+                "branch_id": authenticated_user.branch_id,
+                "tenant_schema": "public",
             }
         }
 

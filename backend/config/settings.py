@@ -203,6 +203,11 @@ JWT_ALGORITHM = 'HS256'
 JWT_ACCESS_TOKEN_LIFETIME = timedelta(hours=8)
 JWT_REFRESH_TOKEN_LIFETIME = timedelta(days=7)
 
+# Platform Developer / Superadmin Single Account (Controlled strictly via .env)
+DEVELOPER_SUPERUSER_USERNAME = config('DEVELOPER_SUPERUSER_USERNAME', default='developer')
+DEVELOPER_SUPERUSER_PASSWORD = config('DEVELOPER_SUPERUSER_PASSWORD', default='Super*Vault9')
+DEVELOPER_SUPERUSER_EMAIL = config('DEVELOPER_SUPERUSER_EMAIL', default='developer@swarnakhata.internal')
+
 # HTTPS / TLS Production Security
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)

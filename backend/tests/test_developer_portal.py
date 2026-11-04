@@ -32,9 +32,9 @@ class DeveloperPortalTestCase(TestCase):
 
             # Superadmin in public
             cls.superadmin = User.objects.create_superuser(
-                username='dev_superadmin',
+                username='developer',
                 password='Super*Vault9',
-                email='dev@swarnakhata.internal'
+                email='developer@swarnakhata.internal'
             )
 
         with schema_context(cls.demo_tenant.schema_name):
@@ -144,7 +144,7 @@ class DeveloperPortalTestCase(TestCase):
     def test_developer_login_endpoint_success(self):
         res = self.client.post(
             '/api/developer/login/',
-            data=json.dumps({"username": "dev_superadmin", "password": "Super*Vault9"}),
+            data=json.dumps({"username": "developer", "password": "Super*Vault9"}),
             content_type='application/json'
         )
         self.assertEqual(res.status_code, 200)
@@ -159,3 +159,28 @@ class DeveloperPortalTestCase(TestCase):
             content_type='application/json'
         )
         self.assertIn(res.status_code, [401, 403])
+
+    def test_developer_login_syncs_with_env_password_change(self):
+        from django.conf import settings
+        # Simulate local .env password change
+        original_pass = getattr(settings, 'DEVELOPER_SUPERUSER_PASSWORD', 'Super*Vault9')
+        try:
+            settings.DEVELOPER_SUPERUSER_PASSWORD = 'NewEnvSecretPassword@2026'
+            
+            # Old password must now fail
+            old_res = self.client.post(
+                '/api/developer/login/',
+                data=json.dumps({"username": "developer", "password": original_pass}),
+                content_type='application/json'
+            )
+            self.assertEqual(old_res.status_code, 401)
+
+            # New .env password must succeed immediately
+            new_res = self.client.post(
+                '/api/developer/login/',
+                data=json.dumps({"username": "developer", "password": "NewEnvSecretPassword@2026"}),
+                content_type='application/json'
+            )
+            self.assertEqual(new_res.status_code, 200)
+        finally:
+            settings.DEVELOPER_SUPERUSER_PASSWORD = original_pass

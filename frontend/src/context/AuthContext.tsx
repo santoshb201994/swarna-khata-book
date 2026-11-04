@@ -25,11 +25,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(savedUser);
         setUser(parsed);
         // Self-heal: If user is a tenant user but tenant_schema was hijacked to 'public',
-        // restore it to the user's authoritative tenant schema or 'demo'.
+        // restore it to the user's authoritative tenant schema.
         const currentTenant = localStorage.getItem('tenant_schema');
-        if (currentTenant === 'public' && parsed.role !== 'superadmin') {
-          const targetTenant = parsed.tenant_schema && parsed.tenant_schema !== 'public' ? parsed.tenant_schema : 'demo';
-          localStorage.setItem('tenant_schema', targetTenant);
+        if (currentTenant === 'public' && parsed.role !== 'superadmin' && parsed.tenant_schema && parsed.tenant_schema !== 'public') {
+          localStorage.setItem('tenant_schema', parsed.tenant_schema);
         }
       } catch {
         localStorage.clear();

@@ -298,7 +298,7 @@ export const MobileScannerPage: React.FC = () => {
           {
             headers: {
               Authorization: `Bearer ${mobileToken}`,
-              'X-Tenant': tenantSchema || 'demo',
+              ...(tenantSchema && tenantSchema !== 'public' ? { 'X-Tenant': tenantSchema } : {}),
             },
           }
         );

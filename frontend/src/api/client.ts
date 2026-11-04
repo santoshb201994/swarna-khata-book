@@ -13,12 +13,12 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   const rawTenant = localStorage.getItem('tenant_schema')
-  // Store operations must never route to 'public' schema
-  const tenant = (!rawTenant || rawTenant === 'public') ? 'demo' : rawTenant
-  config.headers['X-Tenant'] = tenant
+  if (rawTenant && rawTenant !== 'public') {
+    config.headers['X-Tenant'] = rawTenant
+  }
 
   ;(config as unknown as { _startTime: number })._startTime = performance.now()
-  logger.debug('api', `--> ${config.method?.toUpperCase()} ${config.url} [Tenant: ${tenant}]`)
+  logger.debug('api', `--> ${config.method?.toUpperCase()} ${config.url} [Tenant: ${rawTenant || 'default'}]`)
 
   return config
 })
@@ -52,13 +52,16 @@ api.interceptors.response.use(
             refreshPromise = (async () => {
               try {
                 const rawCurrentTenant = localStorage.getItem('tenant_schema')
-                const currentTenant = (!rawCurrentTenant || rawCurrentTenant === 'public') ? 'demo' : rawCurrentTenant
-                logger.info('auth', `Attempting access token refresh [Tenant: ${currentTenant}]`)
+                const refreshHeaders: Record<string, string> = {}
+                if (rawCurrentTenant && rawCurrentTenant !== 'public') {
+                  refreshHeaders['X-Tenant'] = rawCurrentTenant
+                }
+                logger.info('auth', `Attempting access token refresh [Tenant: ${rawCurrentTenant || 'default'}]`)
                 const refreshEndpoint = getApiBaseUrl().endsWith('/api')
                   ? `${getApiBaseUrl()}/auth/token/refresh/`
                   : `${getApiBaseUrl()}/api/auth/token/refresh/`
                 const { data } = await axios.post(refreshEndpoint, { refresh }, {
-                  headers: { 'X-Tenant': currentTenant }
+                  headers: refreshHeaders
                 })
                 localStorage.setItem('access_token', data.access)
                 if (data.refresh) {
