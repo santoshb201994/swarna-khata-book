@@ -89,6 +89,12 @@ def mobile_scan_fallback(request, payload: MobileScanIn):
 
     session_id = claims.get('session_id')
     tenant_schema = claims.get('tenant_schema')
+    tenant = getattr(request, 'tenant', None)
+    if not tenant_schema or tenant_schema == 'public':
+        if tenant and getattr(tenant, 'schema_name', 'public') != 'public':
+            tenant_schema = tenant.schema_name
+        elif request.headers.get('X-Tenant'):
+            tenant_schema = request.headers.get('X-Tenant')
 
     from django_tenants.utils import schema_context
     def _execute_scan():
@@ -96,7 +102,12 @@ def mobile_scan_fallback(request, payload: MobileScanIn):
         if not session:
             return 404, {"error": "Pairing session is no longer active"}
 
-        prod_data, error_msg, is_dup = resolve_and_record_scan(session, payload.event_id, payload.qr_payload)
+        if tenant_schema:
+            session._tenant_schema = tenant_schema
+
+        prod_data, error_msg, is_dup = resolve_and_record_scan(
+            session, payload.event_id, payload.qr_payload, tenant_schema=tenant_schema
+        )
 
         if is_dup:
             return 200, {"status": "duplicate", "event_id": payload.event_id}

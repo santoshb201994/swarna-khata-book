@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
-    "mtime": 1793541505.2048156,
-    "seen": 1793541513.7065768,
-    "ast_hash": "fa2d53e0dcfc4ff0f03755f9326cf967",
+    "mtime": 1793756660.5265486,
+    "seen": 1793756663.5299313,
+    "ast_hash": "7c107d38fd429981c8e5272f8356ed6b",
     "semantic_hash": ""
   },
   "frontend/src/features/camera/CameraCaptureModal.tsx": {
@@ -516,15 +516,15 @@
     "semantic_hash": ""
   },
   "backend/apps/billing/pairing.py": {
-    "mtime": 1793541270.8881247,
-    "seen": 1793541278.9606798,
-    "ast_hash": "902b48d8eb5b61700b89cf0a39d128d1",
+    "mtime": 1793756624.7834697,
+    "seen": 1793756628.3439798,
+    "ast_hash": "3babee519c3ac2574f5951a598a1bcf6",
     "semantic_hash": ""
   },
   "backend/apps/billing/websocket_handler.py": {
-    "mtime": 1793419544.607576,
-    "seen": 1793419552.0805728,
-    "ast_hash": "dd8a720c24d482b93dd65b3cc953affb",
+    "mtime": 1793756564.2505069,
+    "seen": 1793756571.7424333,
+    "ast_hash": "0828237ce893c0d64cedbebb9cec0921",
     "semantic_hash": ""
   },
   "backend/apps/billing/ws_hub.py": {
@@ -660,9 +660,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/pos_pairing_router.py": {
-    "mtime": 1793419557.709946,
-    "seen": 1793419565.4203978,
-    "ast_hash": "63df4793e0c752e7bc6b7008d749fe1c",
+    "mtime": 1793756638.3046627,
+    "seen": 1793756646.70853,
+    "ast_hash": "1e976921f39b51576f6b7abfb131ca1e",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
@@ -1044,9 +1044,9 @@
     "semantic_hash": ""
   },
   "backend/tests/test_tray_qr_tags.py": {
-    "mtime": 1793420118.4323344,
-    "seen": 1793420126.8811018,
-    "ast_hash": "d3aebd15a2b9477a7d975a9076af8487",
+    "mtime": 1793757001.0724463,
+    "seen": 1793757009.8960173,
+    "ast_hash": "10c00d739e54b710d40f75c7cd52819c",
     "semantic_hash": ""
   },
   "frontend/src/features/products/ClubTrayModal.tsx": {

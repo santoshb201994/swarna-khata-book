@@ -121,10 +121,13 @@ export const POSScreen: React.FC = () => {
       let token = localStorage.getItem('access_token');
       if (!token) return;
 
+      const tenantSchema = localStorage.getItem('tenant_schema') || '';
       const wsBase = getWsBaseUrl();
       const wsUrl = `${wsBase}/pos/?session_id=${encodeURIComponent(
         activeSessionId
-      )}&token=${encodeURIComponent(token)}`;
+      )}&token=${encodeURIComponent(token)}${
+        tenantSchema ? `&tenant=${encodeURIComponent(tenantSchema)}` : ''
+      }`;
 
       if (posWsRef.current) {
         try {
@@ -544,7 +547,8 @@ export const POSScreen: React.FC = () => {
     );
   };
 
-  // Keep addToCartRef in sync so the WebSocket onmessage always calls the latest version
+  // Keep addToCartRef in sync immediately and on effect
+  addToCartRef.current = addToCart;
   useEffect(() => {
     addToCartRef.current = addToCart;
   }, [addToCart]);

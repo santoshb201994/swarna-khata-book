@@ -193,9 +193,10 @@ class TrayQRTagsTestCase(TestCase):
                 HTTP_X_TENANT='demo'
             )
             self.assertEqual(del_res.status_code, 200)
-            self.assertFalse(Tray.objects.filter(id=tray.id).exists())
-            # Underlying products must remain intact
-            self.assertTrue(Product.objects.filter(id=self.prod1.id).exists())
+            with schema_context(self.tenant.schema_name):
+                self.assertFalse(Tray.objects.filter(id=tray.id).exists())
+                # Underlying products must remain intact
+                self.assertTrue(Product.objects.filter(id=self.prod1.id).exists())
 
     def test_scanner_tray_resolution(self):
         """Test that scanning a group QR code payload resolves the tray and all its items."""
@@ -239,3 +240,38 @@ class TrayQRTagsTestCase(TestCase):
             self.assertFalse(is_dup2)
             self.assertTrue(prod_data2.get('is_tray'))
             self.assertEqual(prod_data2['tray_code'], "TRAY-SCAN-001")
+
+    def test_scanner_cross_schema_thread_context(self):
+        """
+        Verify that resolve_and_record_scan successfully resolves items when called from
+        a connection currently set to 'public' (as happens in ASGI WebSocket threads).
+        """
+        with schema_context(self.tenant.schema_name):
+            from django.utils import timezone
+            import datetime
+
+            session = POSPairingSession.objects.create(
+                session_id="sess_cross_schema_123",
+                pairing_code="654321",
+                user=self.user,
+                branch=self.branch,
+                expires_at=timezone.now() + datetime.timedelta(hours=1),
+                is_active=True,
+            )
+            session._tenant_schema = self.tenant.schema_name
+
+        # Switch connection explicitly to 'public' schema
+        with schema_context('public'):
+            from django.db import connection
+            self.assertEqual(connection.schema_name, 'public')
+
+            # Call resolve_and_record_scan from public schema without pre-switching
+            prod_data, err, is_dup = resolve_and_record_scan(
+                session, "evt_cross_1", self.prod1.sku, tenant_schema=self.tenant.schema_name
+            )
+            self.assertIsNone(err)
+            self.assertFalse(is_dup)
+            self.assertIsNotNone(prod_data)
+            self.assertEqual(prod_data['id'], self.prod1.id)
+            self.assertEqual(prod_data['sku'], self.prod1.sku)
+            self.assertEqual(prod_data.get('item_status'), 'AVAILABLE')

@@ -190,11 +190,30 @@ def verify_mobile_token(token: str) -> dict:
             return None
 
 
-def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payload: str) -> tuple[dict | None, str | None, bool]:
+def resolve_and_record_scan(
+    session: POSPairingSession, event_id: str, qr_payload: str, tenant_schema: str = None
+) -> tuple[dict | None, str | None, bool]:
     """
     Validates scan event, deduplicates against event_id, resolves item against Product model,
     enforces branch permissions, records audit log, and returns (product_dict, error_message, is_duplicate).
+    Guarantees execution within the tenant schema context even when called from asynchronous worker threads.
     """
+    from django_tenants.utils import schema_context
+    from django.db import connection
+
+    target_schema = tenant_schema or getattr(session, '_tenant_schema', None)
+    if not target_schema or target_schema == 'public':
+        target_schema = getattr(session.user, 'tenant_schema', None)
+
+    if target_schema and target_schema != 'public' and getattr(connection, 'schema_name', None) != target_schema:
+        with schema_context(target_schema):
+            return _inner_resolve_and_record_scan(session, event_id, qr_payload)
+    return _inner_resolve_and_record_scan(session, event_id, qr_payload)
+
+
+def _inner_resolve_and_record_scan(
+    session: POSPairingSession, event_id: str, qr_payload: str
+) -> tuple[dict | None, str | None, bool]:
     # 1. Event deduplication check
     if ScannedItemAudit.objects.filter(event_id=event_id).exists():
         return None, "Event already processed (duplicate)", True
@@ -282,6 +301,7 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
                 "huid": p.huid,
                 "photo_url": p.photo.url if p.photo else None,
                 "is_active": p.is_active,
+                "item_status": "AVAILABLE",
                 "in_stock": True,
                 "quantity_on_hand": 1,
             })
@@ -308,6 +328,16 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
         if item_obj and item_obj.product and item_obj.product.is_active:
             product = item_obj.product
 
+        if not product:
+            from apps.qr_tags.models import QRTag
+            qr_tag_obj = (
+                QRTag.objects.select_related('product', 'product__category', 'product__purity', 'product__branch')
+                .filter(qr_data__icontains=str(target_uuid))
+                .first()
+            )
+            if qr_tag_obj and qr_tag_obj.product and qr_tag_obj.product.is_active:
+                product = qr_tag_obj.product
+
     if not product and target_id:
         product = query.filter(id=target_id).first()
     if not product and target_sku:
@@ -317,6 +347,15 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
     if not product and target_sku:
         # Fallback check if scanned string matches HUID
         product = query.filter(huid__iexact=target_sku).first()
+    if not product and trimmed_payload:
+        from apps.qr_tags.models import QRTag
+        qr_tag_obj = (
+            QRTag.objects.select_related('product', 'product__category', 'product__purity', 'product__branch')
+            .filter(qr_data=trimmed_payload)
+            .first()
+        )
+        if qr_tag_obj and qr_tag_obj.product and qr_tag_obj.product.is_active:
+            product = qr_tag_obj.product
 
     if not product:
         ScannedItemAudit.objects.create(
@@ -378,6 +417,7 @@ def resolve_and_record_scan(session: POSPairingSession, event_id: str, qr_payloa
         "huid": product.huid,
         "photo_url": photo_url,
         "is_active": product.is_active,
+        "item_status": "AVAILABLE",
         "in_stock": in_stock,
         "quantity_on_hand": quantity_on_hand,
     }

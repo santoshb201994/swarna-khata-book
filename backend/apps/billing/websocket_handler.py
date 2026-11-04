@@ -24,20 +24,29 @@ def parse_query_string(query_string_bytes: bytes) -> dict[str, str]:
 @sync_to_async
 def get_active_session(session_id: str, tenant_schema: str = None):
     from django_tenants.utils import schema_context, get_tenant_model
+    from django.db import connection
+
     # 1. Targeted direct schema lookup (O(1))
     if tenant_schema and tenant_schema != 'public':
         try:
             with schema_context(tenant_schema):
                 session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
                 if session:
+                    session._tenant_schema = tenant_schema
                     return session
         except Exception:
             pass
 
     # 2. Try current active connection schema
-    session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
-    if session:
-        return session
+    cur_schema = getattr(connection, 'schema_name', 'public')
+    if cur_schema and cur_schema != 'public':
+        try:
+            session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
+            if session:
+                session._tenant_schema = cur_schema
+                return session
+        except Exception:
+            pass
 
     # 3. Graceful fallback search if tenant_schema was omitted
     try:
@@ -46,6 +55,7 @@ def get_active_session(session_id: str, tenant_schema: str = None):
             with schema_context(tenant.schema_name):
                 session = POSPairingSession.objects.filter(session_id=session_id, is_active=True).select_related('user', 'branch').first()
                 if session:
+                    session._tenant_schema = tenant.schema_name
                     return session
     except Exception:
         pass
@@ -106,6 +116,8 @@ async def pos_websocket_app(scope, receive, send):
         await send({"type": "websocket.close", "code": 4404})
         return
 
+    active_tenant_schema = tenant_schema or getattr(session, '_tenant_schema', None)
+
     # Validate user auth
     is_valid_user = await validate_jwt_user(token, session.user_id)
     if not is_valid_user:
@@ -114,7 +126,7 @@ async def pos_websocket_app(scope, receive, send):
 
     # Accept connection
     await send({"type": "websocket.accept"})
-    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, tenant_schema, session.user_id)
+    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, active_tenant_schema, session.user_id)
 
     async def send_json(data: dict):
         try:
@@ -138,8 +150,17 @@ async def pos_websocket_app(scope, receive, send):
                     if action == "ping":
                         await send_json({"type": "pong"})
                     elif action == "revoke":
-                        session.is_active = False
-                        await sync_to_async(session.save)(update_fields=['is_active'])
+                        def _revoke(sess, schema):
+                            from django_tenants.utils import schema_context
+                            if schema and schema != 'public':
+                                with schema_context(schema):
+                                    sess.is_active = False
+                                    sess.save(update_fields=['is_active'])
+                            else:
+                                sess.is_active = False
+                                sess.save(update_fields=['is_active'])
+
+                        await sync_to_async(_revoke)(session, active_tenant_schema)
                         await hub.revoke_session(session_id)
                         await send_json({"type": "session_revoked"})
                 except Exception as e:
@@ -175,9 +196,11 @@ async def mobile_websocket_app(scope, receive, send):
         await send({"type": "websocket.close", "code": 4404})
         return
 
+    active_tenant_schema = tenant_schema or getattr(session, '_tenant_schema', None)
+
     # Accept connection
     await send({"type": "websocket.accept"})
-    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, tenant_schema, session.user_id)
+    audit_logger.info("WS_POS_CONNECTED: session_id=%s tenant='%s' user_id=%s", session_id, active_tenant_schema, session.user_id)
 
     async def send_json(data: dict):
         try:
@@ -233,9 +256,16 @@ async def mobile_websocket_app(scope, receive, send):
                             })
                             continue
 
-                        # Resolve against real inventory
-                        prod_data, error_msg, is_dup = await sync_to_async(resolve_and_record_scan)(
-                            session, event_id, qr_payload
+                        # Resolve against real inventory in the active tenant schema context
+                        def _sync_resolve(sess, evt_id, payload_str, schema):
+                            from django_tenants.utils import schema_context
+                            if schema and schema != 'public':
+                                with schema_context(schema):
+                                    return resolve_and_record_scan(sess, evt_id, payload_str, tenant_schema=schema)
+                            return resolve_and_record_scan(sess, evt_id, payload_str, tenant_schema=schema)
+
+                        prod_data, error_msg, is_dup = await sync_to_async(_sync_resolve)(
+                            session, event_id, qr_payload, active_tenant_schema
                         )
 
                         if is_dup:
@@ -284,8 +314,8 @@ async def mobile_websocket_app(scope, receive, send):
                                     "status": "success",
                                     "item_name": prod_data["name"],
                                     "sku": prod_data["sku"],
-                                    "purity": prod_data["purity_name"],
-                                    "net_weight": prod_data["net_weight"],
+                                    "purity": prod_data.get("purity_name", "22KT"),
+                                    "net_weight": prod_data.get("net_weight", "0"),
                                 })
                         else:
                             # Not found or unauthorized
