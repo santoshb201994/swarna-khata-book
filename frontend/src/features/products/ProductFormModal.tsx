@@ -20,10 +20,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   categories,
   purities,
 }) => {
+  const [internalCategories, setInternalCategories] = useState<Category[]>([]);
+  const [internalPurities, setInternalPurities] = useState<Purity[]>([]);
+  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
+
+  const activeCategories = categories.length > 0 ? categories : internalCategories;
+  const activePurities = purities.length > 0 ? purities : internalPurities;
+
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
-  const [categoryId, setCategoryId] = useState<number>(categories[0]?.id || 1);
-  const [purityId, setPurityId] = useState<number>(purities[0]?.id || 1);
+  const [categoryId, setCategoryId] = useState<number>(activeCategories[0]?.id || 0);
+  const [purityId, setPurityId] = useState<number>(activePurities[0]?.id || 0);
   const [grossWeight, setGrossWeight] = useState('');
   const [stoneWeight, setStoneWeight] = useState('0.000');
   const [otherWeight, setOtherWeight] = useState('0.000');
@@ -36,22 +43,47 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Self-heal: Fetch categories and purities if none are provided or props are empty
+  useEffect(() => {
+    if (isOpen && (categories.length === 0 || purities.length === 0)) {
+      setIsLoadingDropdowns(true);
+      Promise.allSettled([api.get('/categories/'), api.get('/purities/')])
+        .then(([catRes, purRes]) => {
+          if (catRes.status === 'fulfilled') {
+            const fetchedCats = catRes.value.data.results || catRes.value.data || [];
+            setInternalCategories(fetchedCats);
+            if (fetchedCats.length > 0 && (!categoryId || categoryId === 0)) {
+              setCategoryId(fetchedCats[0].id);
+            }
+          }
+          if (purRes.status === 'fulfilled') {
+            const fetchedPurs = purRes.value.data.results || purRes.value.data || [];
+            setInternalPurities(fetchedPurs);
+            if (fetchedPurs.length > 0 && (!purityId || purityId === 0)) {
+              setPurityId(fetchedPurs[0].id);
+            }
+          }
+        })
+        .finally(() => setIsLoadingDropdowns(false));
+    }
+  }, [isOpen, categories.length, purities.length]);
+
   const handleCategoryChange = (newCatId: number) => {
     setCategoryId(newCatId);
-    const cat = categories.find((c) => c.id === newCatId);
+    const cat = activeCategories.find((c) => c.id === newCatId);
     if (cat) {
       const catName = cat.name.toLowerCase();
       if (/silver|chandi/i.test(catName)) {
-        const silverPurity = purities.find((p) => /silver|925|chandi/i.test(p.name));
+        const silverPurity = activePurities.find((p) => /silver|925|chandi/i.test(p.name));
         if (silverPurity) {
           setPurityId(silverPurity.id);
           if (makingCharge === '450.00') setMakingCharge('15.00');
         }
       } else if (/platinum|\bpt\b/i.test(catName)) {
-        const platPurity = purities.find((p) => /platinum|950/i.test(p.name));
+        const platPurity = activePurities.find((p) => /platinum|950/i.test(p.name));
         if (platPurity) setPurityId(platPurity.id);
       } else if (/gold/i.test(catName)) {
-        const goldPurity = purities.find((p) => /22kt|916/i.test(p.name)) || purities[0];
+        const goldPurity = activePurities.find((p) => /22kt|916/i.test(p.name)) || activePurities[0];
         if (goldPurity) setPurityId(goldPurity.id);
       }
     }
@@ -60,9 +92,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleNameChange = (newName: string) => {
     setName(newName);
     if (/silver|payal|anklet/i.test(newName)) {
-      const silverCat = categories.find((c) => /silver/i.test(c.name));
-      const silverPurity = purities.find((p) => /silver|925|chandi/i.test(p.name));
-      const curPurity = purities.find((p) => p.id === purityId);
+      const silverCat = activeCategories.find((c) => /silver/i.test(c.name));
+      const silverPurity = activePurities.find((p) => /silver|925|chandi/i.test(p.name));
+      const curPurity = activePurities.find((p) => p.id === purityId);
       if (curPurity && !/silver|925|chandi/i.test(curPurity.name) && silverPurity) {
         setPurityId(silverPurity.id);
         if (silverCat) setCategoryId(silverCat.id);
@@ -71,20 +103,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const selectedPurity = purities.find((p) => p.id === purityId);
-  const selectedCat = categories.find((c) => c.id === categoryId);
+  const selectedPurity = activePurities.find((p) => p.id === purityId);
+  const selectedCat = activeCategories.find((c) => c.id === categoryId);
   const isSilverItem = /silver|925|chandi|payal|anklet/i.test(`${selectedPurity?.name || ''} ${selectedCat?.name || ''} ${name}`);
   const isPlatItem = /platinum|950|\bpt\b/i.test(`${selectedPurity?.name || ''} ${selectedCat?.name || ''} ${name}`);
   const detectedMetalName = isSilverItem ? 'Silver' : isPlatItem ? 'Platinum' : 'Gold';
 
   useEffect(() => {
-    if (categories.length > 0 && (!categoryId || !categories.some((c) => c.id === categoryId))) {
-      setCategoryId(categories[0].id);
+    if (activeCategories.length > 0 && (!categoryId || !activeCategories.some((c) => c.id === categoryId))) {
+      setCategoryId(activeCategories[0].id);
     }
-    if (purities.length > 0 && (!purityId || !purities.some((p) => p.id === purityId))) {
-      setPurityId(purities[0].id);
+    if (activePurities.length > 0 && (!purityId || !activePurities.some((p) => p.id === purityId))) {
+      setPurityId(activePurities[0].id);
     }
-  }, [categories, purities]);
+  }, [activeCategories, activePurities]);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,8 +130,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setHuid('');
       setPhotoFile(null);
       setPhotoPreview(null);
-      if (categories.length > 0) setCategoryId(categories[0].id);
-      if (purities.length > 0) setPurityId(purities[0].id);
+      if (activeCategories.length > 0) setCategoryId(activeCategories[0].id);
+      if (activePurities.length > 0) setPurityId(activePurities[0].id);
     }
   }, [isOpen]);
 
@@ -133,6 +165,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const otherVal = parseFloat(otherWeight) || 0;
     if (stoneVal + otherVal >= grossVal) {
       toast.error('Stone weight + Other weight cannot exceed Gross weight');
+      return;
+    }
+    if (!categoryId || Number(categoryId) <= 0 || !purityId || Number(purityId) <= 0) {
+      toast.error('Please select a valid Category and Purity.');
       return;
     }
 
@@ -174,7 +210,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      const serverErr = err.response?.data?.error || (err.response?.data?.sku && `SKU: ${err.response.data.sku[0]}`) || (err.response?.data?.huid && `HUID: ${err.response.data.huid[0]}`);
+      const serverErr =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        (err.response?.data?.sku && `SKU: ${err.response.data.sku[0]}`) ||
+        (err.response?.data?.huid && `HUID: ${err.response.data.huid[0]}`) ||
+        (err.response?.data?.non_field_errors && err.response.data.non_field_errors[0]);
       const msg = serverErr
         ? String(serverErr)
         : 'Failed to create product. Please verify inputs.';
@@ -293,30 +334,44 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
                   <select
-                    value={categoryId}
+                    value={categoryId || ''}
                     onChange={(e) => handleCategoryChange(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                    disabled={isLoadingDropdowns || activeCategories.length === 0}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
+                    {activeCategories.length === 0 ? (
+                      <option value="" disabled>
+                        {isLoadingDropdowns ? 'Loading categories...' : 'No categories available'}
                       </option>
-                    ))}
+                    ) : (
+                      activeCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Purity *</label>
                   <select
-                    value={purityId}
+                    value={purityId || ''}
                     onChange={(e) => setPurityId(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                    disabled={isLoadingDropdowns || activePurities.length === 0}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
-                    {purities.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
+                    {activePurities.length === 0 ? (
+                      <option value="" disabled>
+                        {isLoadingDropdowns ? 'Loading purities...' : 'No purities available'}
                       </option>
-                    ))}
+                    ) : (
+                      activePurities.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>

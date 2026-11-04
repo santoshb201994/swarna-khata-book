@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "backend/apps/accounting/services.py": {
-    "mtime": 1793130065.430725,
-    "seen": 1793130072.2477686,
-    "ast_hash": "84a9f32c81808db924ebc02c795098de",
+    "mtime": 1793810341.7852678,
+    "seen": 1793810350.5140915,
+    "ast_hash": "15feab7c847943a817f0e12597a1ff15",
     "semantic_hash": ""
   },
   "backend/apps/accounts/__init__.py": {
@@ -252,9 +252,9 @@
     "semantic_hash": "409f7e836d98796a343d7550e54c7fd7"
   },
   "backend/apps/stock/services.py": {
-    "mtime": 1792920614.5375354,
-    "seen": 1792920622.6792016,
-    "ast_hash": "5b282cac89d50ae5c5bcd26f39864432",
+    "mtime": 1793810316.5381305,
+    "seen": 1793810325.4123833,
+    "ast_hash": "31551dc299609360a2bd6dce06df3295",
     "semantic_hash": ""
   },
   "backend/config/__init__.py": {
@@ -336,9 +336,9 @@
     "semantic_hash": ""
   },
   "frontend/src/components/Layout.tsx": {
-    "mtime": 1793197835.1522224,
-    "seen": 1793197842.5072515,
-    "ast_hash": "ec066bae85c062046ab52f8bc545dad0",
+    "mtime": 1793810676.6870816,
+    "seen": 1793810684.4865475,
+    "ast_hash": "b25cc503f832438fa7f67368da664f63",
     "semantic_hash": ""
   },
   "frontend/src/context/AuthContext.tsx": {
@@ -372,15 +372,15 @@
     "semantic_hash": "5e68b2cfea13eb053c98228fadb8b424"
   },
   "frontend/src/features/products/ProductFormModal.tsx": {
-    "mtime": 1793197719.8147993,
-    "seen": 1793197727.2645762,
-    "ast_hash": "6909819bf6dc4b4425bccf1d7ce052df",
+    "mtime": 1793810591.1746116,
+    "seen": 1793810600.0748188,
+    "ast_hash": "1f6f6dd3931324e355c9cfa525febf36",
     "semantic_hash": ""
   },
   "frontend/src/features/products/ProductList.tsx": {
-    "mtime": 1793545012.1001277,
-    "seen": 1793545019.860527,
-    "ast_hash": "3dda460a3352810b6b64e5cff698ec6a",
+    "mtime": 1793810417.4290473,
+    "seen": 1793810426.4189622,
+    "ast_hash": "7b927f4ebf2e51a8cb17e431d5fba1d8",
     "semantic_hash": ""
   },
   "frontend/src/features/products/QRTagModal.tsx": {
@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/auth.py": {
-    "mtime": 1793794200.6783311,
-    "seen": 1793794208.7747483,
-    "ast_hash": "42879dc600d42e5bec579baef5fe046a",
+    "mtime": 1793809770.0401835,
+    "seen": 1793809778.9911823,
+    "ast_hash": "b695a289431dcb797b8a3db158ee0197",
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
@@ -630,9 +630,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
-    "mtime": 1793546492.2406697,
-    "seen": 1793546500.1563027,
-    "ast_hash": "74bc3dd6b549cc6efc9279d735b7f004",
+    "mtime": 1793810386.2605405,
+    "seen": 1793810395.186177,
+    "ast_hash": "2c9734ef2483089f49f7285585b15646",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/stock_router.py": {
@@ -642,9 +642,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/billing_router.py": {
-    "mtime": 1793541238.8160696,
-    "seen": 1793541246.9126627,
-    "ast_hash": "1539fc844c5ef39929aa05dd143e8e78",
+    "mtime": 1793810327.9156353,
+    "seen": 1793810336.6712384,
+    "ast_hash": "127e396cf2a0570c135d2903e4bb417d",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/accounting_router.py": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
-    "mtime": 1793793310.5911717,
-    "seen": 1793793319.1903255,
-    "ast_hash": "1d4c767662c80d7fa183fc627eca3ce2",
+    "mtime": 1793809816.2173145,
+    "seen": 1793809824.4835856,
+    "ast_hash": "6823a49a265fd3c1e685ce36de67a467",
     "semantic_hash": ""
   },
   "backend/ninja_api/api.py": {
@@ -828,9 +828,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/developer/DeveloperPortal.tsx": {
-    "mtime": 1793793362.2965658,
-    "seen": 1793793371.1010544,
-    "ast_hash": "be34f8d3779ebfb199efdae89ca1be9c",
+    "mtime": 1793810402.2185175,
+    "seen": 1793810410.9765897,
+    "ast_hash": "84419838c7d08a36b7d2857d09ae5a54",
     "semantic_hash": ""
   },
   ".agents/rules/verify-before-complete.md": {

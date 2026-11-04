@@ -366,7 +366,7 @@ def developer_switch_store_token(request, payload: SwitchStoreIn):
         return 400, {"error": "Invalid tenant schema."}
 
     with schema_context(target_schema):
-        token = create_token(request.auth, token_type='access')
+        token = create_token(request.auth, token_type='access', schema_name=target_schema)
 
     return 200, {
         "access": token,

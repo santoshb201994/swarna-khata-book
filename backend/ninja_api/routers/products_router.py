@@ -66,9 +66,23 @@ def _format_product(request, prod: Product) -> dict:
 # CATEGORIES & PURITIES
 # ==============================================================================
 
+DEFAULT_CATEGORIES = ["Gold Jewellery", "Silver Ornaments", "Diamond Jewellery", "Platinum"]
+
+DEFAULT_PURITIES = [
+    ("24KT Pure Gold", Decimal('0.999')),
+    ("22KT Hallmarked 916", Decimal('0.916')),
+    ("18KT Diamond Studded", Decimal('0.750')),
+    ("925 Sterling Silver", Decimal('0.925')),
+]
+
 @router.get("/categories/", response=List[CategoryOut], auth=jwt_auth)
 def list_categories(request):
-    return Category.objects.all()
+    qs = Category.objects.all()
+    if not qs.exists():
+        for cat_name in DEFAULT_CATEGORIES:
+            Category.objects.get_or_create(name=cat_name)
+        qs = Category.objects.all()
+    return qs
 
 
 @router.post("/categories/", response={201: CategoryOut, 400: dict}, auth=jwt_auth)
@@ -82,7 +96,12 @@ def create_category(request, payload: CategoryIn):
 
 @router.get("/purities/", response=List[PurityOut], auth=jwt_auth)
 def list_purities(request):
-    return Purity.objects.all()
+    qs = Purity.objects.all()
+    if not qs.exists():
+        for p_name, fineness in DEFAULT_PURITIES:
+            Purity.objects.get_or_create(name=p_name, defaults={'fineness': fineness})
+        qs = Purity.objects.all()
+    return qs
 
 
 @router.post("/purities/", response={201: PurityOut, 400: dict}, auth=jwt_auth)
@@ -206,15 +225,23 @@ def create_product(request, payload: ProductIn):
     if combined_deductions >= payload.gross_weight:
         return 400, {"error": "Stone weight + Other weight must be less than Gross weight. Net weight cannot be zero or negative."}
 
-    category = get_object_or_404(Category, id=payload.category_id)
-    purity = get_object_or_404(Purity, id=payload.purity_id)
+    category = Category.objects.filter(id=payload.category_id).first()
+    if not category:
+        return 400, {"error": f"Selected Category ID ({payload.category_id}) does not exist. Please select a valid Category."}
+
+    purity = Purity.objects.filter(id=payload.purity_id).first()
+    if not purity:
+        return 400, {"error": f"Selected Purity ID ({payload.purity_id}) does not exist. Please select a valid Purity."}
 
     branch = None
     if payload.branch_id:
         from apps.accounts.models import Branch
         branch = Branch.objects.filter(id=payload.branch_id).first()
-    elif request.auth and request.auth.branch:
+    elif request.auth and getattr(request.auth, 'branch', None):
         branch = request.auth.branch
+    else:
+        from apps.accounts.models import Branch
+        branch = Branch.objects.filter(is_active=True).first() or Branch.objects.first()
 
     prod = Product.objects.create(
         name=payload.name,

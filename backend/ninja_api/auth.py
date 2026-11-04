@@ -5,7 +5,7 @@ from ninja.security import HttpBearer
 from apps.accounts.models import User
 
 
-def create_token(user: User, token_type: str = 'access') -> str:
+def create_token(user: User, token_type: str = 'access', schema_name: str = None) -> str:
     now = datetime.now(timezone.utc)
     lifetime = (
         settings.JWT_ACCESS_TOKEN_LIFETIME
@@ -14,7 +14,7 @@ def create_token(user: User, token_type: str = 'access') -> str:
     )
     exp = now + lifetime
     from django.db import connection
-    current_schema = getattr(user, 'tenant_schema', None) or getattr(connection, 'schema_name', None)
+    current_schema = schema_name or getattr(user, 'tenant_schema', None) or getattr(connection, 'schema_name', None)
 
     role = 'superadmin' if (user.is_superuser or user.role == 'superadmin') else user.role
     payload = {
@@ -93,6 +93,11 @@ class JWTAuth(HttpBearer):
                 connection.set_tenant(tenant)
                 request.tenant = tenant
             user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
+            if not user and is_super:
+                with schema_context('public'):
+                    user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
+                if user:
+                    user.role = 'superadmin'
         else:
             with schema_context('public'):
                 user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()

@@ -89,16 +89,24 @@ export const ProductList: React.FC = () => {
   const fetchInitialData = async () => {
     try {
       setIsLoading(true);
-      const [prodRes, catRes, purRes] = await Promise.all([
+      const [prodRes, catRes, purRes] = await Promise.allSettled([
         api.get('/products/'),
         api.get('/categories/'),
         api.get('/purities/'),
       ]);
-      setProducts(prodRes.data.results || prodRes.data);
-      setCategories(catRes.data.results || catRes.data);
-      setPurities(purRes.data.results || purRes.data);
+      if (prodRes.status === 'fulfilled') {
+        setProducts(prodRes.value.data.results || prodRes.value.data || []);
+      } else {
+        toast.error('Failed to load products');
+      }
+      if (catRes.status === 'fulfilled') {
+        setCategories(catRes.value.data.results || catRes.value.data || []);
+      }
+      if (purRes.status === 'fulfilled') {
+        setPurities(purRes.value.data.results || purRes.value.data || []);
+      }
     } catch {
-      toast.error('Failed to load products');
+      toast.error('Failed to load product data');
     } finally {
       setIsLoading(false);
     }

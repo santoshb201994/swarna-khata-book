@@ -157,10 +157,13 @@ async def sync_rates_from_source(source_id: str, branch=None, user=None, tenant_
                             effective_date=effective_date
                         ).order_by('-created_at').first()
 
+                        from apps.accounts.models import User
+                        rate_user = user if (user and getattr(user, 'is_authenticated', False) and User.objects.filter(id=user.id).exists()) else None
+
                         if rate_obj:
                             rate_obj.rate_per_gram = matched_val
                             rate_obj.is_current = True
-                            rate_obj.entered_by = user
+                            rate_obj.entered_by = rate_user
                             rate_obj.save()
                         else:
                             rate_obj = GoldRate.objects.create(
@@ -169,7 +172,7 @@ async def sync_rates_from_source(source_id: str, branch=None, user=None, tenant_
                                 effective_date=effective_date,
                                 rate_per_gram=matched_val,
                                 is_current=True,
-                                entered_by=user,
+                                entered_by=rate_user,
                             )
                         entered_name = "Admin"
                         if user:

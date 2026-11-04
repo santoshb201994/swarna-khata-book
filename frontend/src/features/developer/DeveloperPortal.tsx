@@ -244,10 +244,16 @@ export const DeveloperPortal: React.FC = () => {
       const res = await api.post('/developer/switch-store-token/', { schema_name: schema });
       const { access } = res.data;
       localStorage.setItem('access_token', access);
+      localStorage.setItem('tenant_schema', schema);
       localStorage.setItem('x_tenant_schema', schema);
 
-      const meRes = await api.get('/auth/me');
-      localStorage.setItem('user_info', JSON.stringify(meRes.data));
+      const meRes = await api.get('/auth/me', {
+        headers: {
+          Authorization: `Bearer ${access}`,
+          'X-Tenant': schema,
+        },
+      });
+      localStorage.setItem('user_info', JSON.stringify({ ...meRes.data, tenant_schema: schema }));
 
       toast.success(`Entered store schema '${schema}' with full superadmin privileges!`);
       window.location.href = '/';

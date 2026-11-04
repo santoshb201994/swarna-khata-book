@@ -11,6 +11,7 @@ import {
   Settings2,
   UserCheck,
   Download,
+  Terminal,
 } from 'lucide-react';
 import { StaffManagementModal } from '../features/users/StaffManagementModal';
 import { InvoiceSettingsModal } from '../features/billing/InvoiceSettingsModal';
@@ -52,6 +53,17 @@ export const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+            {user?.role === 'superadmin' && (
+              <NavLink
+                to="/developer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold transition shadow-xs"
+                title="Return to Developer Control Plane"
+              >
+                <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Developer Hub</span>
+              </NavLink>
+            )}
+
             {canAccessCustomers && (
               <button
                 onClick={() => setIsCustomerModalOpen(true)}
@@ -100,7 +112,7 @@ export const Layout: React.FC = () => {
               <div className="text-right hidden sm:block">
                 <div className="text-xs font-bold text-slate-800">{user?.username}</div>
                 <div className="text-[10px] uppercase font-semibold text-amber-600">
-                  {user?.role === 'staff' ? 'Salesman' : user?.role || 'owner'}
+                  {user?.role === 'superadmin' ? 'Superadmin' : user?.role === 'staff' ? 'Salesman' : user?.role || 'owner'}
                 </div>
               </div>
               <button

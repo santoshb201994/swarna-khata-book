@@ -222,11 +222,12 @@ def create_sale_invoice(request, payload: SaleCreateIn):
 
         # 3. Create Draft Sale
         invoice_num = _next_invoice_number(branch)
+        valid_sale_user = user if (user and User.objects.filter(id=user.id).exists()) else None
         sale = Sale.objects.create(
             invoice_number=invoice_num,
             customer=customer,
             branch=branch,
-            created_by=user,
+            created_by=valid_sale_user,
             gold_rate_per_gram=Decimal('0.00'),
             notes=payload.notes or '',
         )

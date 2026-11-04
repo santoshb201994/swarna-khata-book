@@ -26,6 +26,11 @@ def record_stock_movement(product, movement_type, quantity, reference_type='', r
 
         summary.save()
 
+        # Resolve user safely within the current tenant schema to avoid FK constraint violations
+        # (e.g. when platform superadmin operates inside a tenant schema)
+        from apps.accounts.models import User
+        valid_user = user if (user and getattr(user, 'is_authenticated', False) and User.objects.filter(id=user.id).exists()) else None
+
         movement = StockMovement.objects.create(
             product=product,
             movement_type=movement_type,
@@ -33,7 +38,7 @@ def record_stock_movement(product, movement_type, quantity, reference_type='', r
             reference_type=reference_type,
             reference_id=reference_id,
             note=note,
-            created_by=user,
+            created_by=valid_user,
             branch=branch,
         )
         return movement
