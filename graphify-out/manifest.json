@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "backend/apps/qr_tags/services.py": {
-    "mtime": 1793541303.6487243,
-    "seen": 1793541311.206298,
-    "ast_hash": "b886b64cd9b5c0b430c82e1b657106a3",
+    "mtime": 1793807092.6684265,
+    "seen": 1793807101.5235615,
+    "ast_hash": "ac0a21065e22c3e883d6bd4b729e6033",
     "semantic_hash": ""
   },
   "backend/apps/stock/__init__.py": {
@@ -270,8 +270,8 @@
     "semantic_hash": ""
   },
   "backend/config/settings.py": {
-    "mtime": 1793768288.2502224,
-    "seen": 1793768296.0751493,
+    "mtime": 1793800669.3765826,
+    "seen": 1793800688.1480494,
     "ast_hash": "fe2c20d2ea013df1858b30da6c7485c8",
     "semantic_hash": ""
   },
@@ -318,9 +318,9 @@
     "semantic_hash": "029f4905006c1fffd96bc863e2d98d3e"
   },
   "frontend/package.json": {
-    "mtime": 1793127819.0905256,
-    "seen": 1793127827.1517184,
-    "ast_hash": "5990b261332c64ae08f858642fb4ba9a",
+    "mtime": 1793797694.5564353,
+    "seen": 1793797719.6112497,
+    "ast_hash": "6128c43c8f8fe26b882b1bf7919e1b90",
     "semantic_hash": ""
   },
   "frontend/src/App.tsx": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/qr_tags_router.py": {
-    "mtime": 1793546498.134755,
-    "seen": 1793546500.1563027,
-    "ast_hash": "d6a53d81117806802d142d62f591d802",
+    "mtime": 1793807100.473788,
+    "seen": 1793807101.5235615,
+    "ast_hash": "c9b11237095562003e74eb3628ea55f2",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/pos_pairing_router.py": {
@@ -1245,6 +1245,78 @@
     "mtime": 1793633156.878038,
     "seen": 1793633164.4086506,
     "ast_hash": "e4d5204515d793ab051a2a5a020b7d18",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_endpoints_auth_and_branches.py": {
+    "mtime": 1793806286.3792667,
+    "seen": 1793806291.625394,
+    "ast_hash": "822ec671ea3f5cb6071d9a44725345cb",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_endpoints_products_qr_and_stock.py": {
+    "mtime": 1793806823.3610547,
+    "seen": 1793806832.696585,
+    "ast_hash": "59e137d6b0ff290b6e463d0236e49fad",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_endpoints_billing_pos_and_export.py": {
+    "mtime": 1793807505.9179416,
+    "seen": 1793807514.6652248,
+    "ast_hash": "562d2d1d30d2704d5ec7f04bb21f4a18",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_endpoints_accounting_and_daybook.py": {
+    "mtime": 1793808140.414071,
+    "seen": 1793808149.3812022,
+    "ast_hash": "37e21316f7ee3bc167231ee3809c3b04",
+    "semantic_hash": ""
+  },
+  "frontend/src/features/billing/__tests__/metalRateHelper.test.ts": {
+    "mtime": 1793797953.0487704,
+    "seen": 1793797976.6750033,
+    "ast_hash": "e653798db4f401dc22d7f5bab4cc1ec0",
+    "semantic_hash": ""
+  },
+  "frontend/src/utils/__tests__/passwordPolicy.test.ts": {
+    "mtime": 1793797794.7752388,
+    "seen": 1793797816.0073187,
+    "ast_hash": "e83efade0bba0032cd3d3bc3d3d87819",
+    "semantic_hash": ""
+  },
+  "frontend/src/utils/__tests__/qrPayload.test.ts": {
+    "mtime": 1793797872.7662213,
+    "seen": 1793797893.3581736,
+    "ast_hash": "51dc8383a2687013cc6ed900e8c0ae4f",
+    "semantic_hash": ""
+  },
+  "frontend/vitest.config.ts": {
+    "mtime": 1793797788.8239894,
+    "seen": 1793797816.0073187,
+    "ast_hash": "d14e927d578a1ba4fceda6e683eddd03",
+    "semantic_hash": ""
+  },
+  "frontend/e2e/store_registration_and_reset.spec.ts": {
+    "mtime": 1793799323.2008283,
+    "seen": 1793799346.5966277,
+    "ast_hash": "4130b4cae42422f76c5fe63ab9073d29",
+    "semantic_hash": ""
+  },
+  "frontend/e2e/mobile_scanner_pairing.spec.ts": {
+    "mtime": 1793799689.7324603,
+    "seen": 1793799702.8462884,
+    "ast_hash": "e072f6fe813c2fc93a1ce94d3fc45c0b",
+    "semantic_hash": ""
+  },
+  "frontend/e2e/developer_portal_deletion.spec.ts": {
+    "mtime": 1793799758.742276,
+    "seen": 1793799779.0770538,
+    "ast_hash": "a7bee7f07b6c52a08eab79c9ad8597ec",
+    "semantic_hash": ""
+  },
+  "frontend/e2e/invoice_settings_and_printing.spec.ts": {
+    "mtime": 1793798257.1965902,
+    "seen": 1793798293.6885018,
+    "ast_hash": "60573e176beffa802c5ea3a3441216a1",
     "semantic_hash": ""
   }
 }

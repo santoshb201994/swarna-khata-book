@@ -85,20 +85,15 @@ def generate_qr_for_tray(tray: Tray):
     return tray
 
 
-async def generate_qr_batch_async(products):
+def generate_qr_batch(products, schema_name: str = None):
     """
-    Asynchronously generate QR tags for a list of products in parallel.
-    Safely captures the active tenant schema to prevent thread-local isolation loss.
+    Generate QR tag metadata for a list of products in a batch.
+    Unified QR metadata architecture renders QR barcodes dynamically on the client,
+    executing cleanly in the active tenant context without thread pool connection leaks.
     """
-    import asyncio
-    from django.db import connection
-    from django_tenants.utils import schema_context
-    current_schema = getattr(connection, 'schema_name', 'public')
+    return [generate_qr_for_product(prod) for prod in products]
 
-    def _threaded_qr(prod):
-        with schema_context(current_schema):
-            return generate_qr_for_product(prod)
 
-    tasks = [asyncio.to_thread(_threaded_qr, product) for product in products]
-    results = await asyncio.gather(*tasks)
-    return list(results)
+async def generate_qr_batch_async(products, schema_name: str = None):
+    from asgiref.sync import sync_to_async
+    return await sync_to_async(generate_qr_batch)(products, schema_name=schema_name)

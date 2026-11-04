@@ -139,6 +139,23 @@ def list_qr_tags(request):
     return [_format_qrtag(request, t) for t in tags]
 
 
+@router.post("/qr-tags/batch-generate/", response={200: List[QRTagOut], 400: dict}, auth=jwt_auth)
+def batch_generate_tags(request, payload: BatchQRIn):
+    """
+    Generate QR tags for a list of products.
+    """
+    if not payload.product_ids:
+        return 400, {"error": "product_ids cannot be empty"}
+
+    products = list(Product.objects.filter(id__in=payload.product_ids))
+    if not products:
+        return 400, {"error": "No matching products found."}
+
+    from apps.qr_tags.services import generate_qr_batch
+    tags = generate_qr_batch(products)
+    return 200, [_format_qrtag(request, t) for t in tags]
+
+
 @router.get("/qr-tags/{tag_id}/", response=QRTagOut, auth=jwt_auth)
 def get_qr_tag(request, tag_id: int):
     tag = get_object_or_404(
@@ -162,23 +179,6 @@ def regenerate_tag(request, tag_id: int):
     tag = get_object_or_404(QRTag, id=tag_id)
     new_tag = generate_qr_for_product(tag.product)
     return _format_qrtag(request, new_tag)
-
-
-@router.post("/qr-tags/batch-generate/", response={200: List[QRTagOut], 400: dict}, auth=jwt_auth)
-def batch_generate_tags(request, payload: BatchQRIn):
-    """
-    Generate QR tags for a list of products concurrently.
-    """
-    if not payload.product_ids:
-        return 400, {"error": "product_ids cannot be empty"}
-
-    products = list(Product.objects.filter(id__in=payload.product_ids))
-    if not products:
-        return 400, {"error": "No matching products found."}
-
-    from asgiref.sync import async_to_sync
-    tags = async_to_sync(generate_qr_batch_async)(products)
-    return 200, [_format_qrtag(request, t) for t in tags]
 
 
 # ==============================================================================
