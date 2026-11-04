@@ -13,8 +13,8 @@ test.describe('Product Form Validation', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[placeholder="e.g. owner or ramesh_sales"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[placeholder="e.g. owner or admin"]', 'santosh');
+    await page.fill('input[type="password"]', 'Santosh@123');
     await page.click('button:has-text("Sign In to Store")');
     await expect(page.getByRole('link', { name: 'POS Billing & Invoice' })).toBeVisible({ timeout: 15000 });
 

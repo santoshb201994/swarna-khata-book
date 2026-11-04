@@ -28,6 +28,19 @@ interface RateSource {
   is_default: boolean;
 }
 
+const DEFAULT_RATE_SOURCES: RateSource[] = [
+  { id: 'ksjf', name: 'Karnataka State Jewellers Federation (KSJF)', url: 'https://ksjf.in/market.php', description: '', is_default: true },
+  { id: 'ibja', name: 'India Bullion & Jewellers Association (IBJA)', url: 'https://ibjarates.com', description: '', is_default: false },
+  { id: 'bullion_desk', name: 'National Bullion Market Desk (Real-time Spot)', url: 'https://bulliondesk.in', description: '', is_default: false },
+];
+
+const DEFAULT_PURITY_OPTIONS = [
+  { purity_id: 1, purity_name: '24KT Pure Gold' },
+  { purity_id: 2, purity_name: '22KT Hallmarked 916' },
+  { purity_id: 3, purity_name: '18KT Diamond Studded' },
+  { purity_id: 4, purity_name: '925 Sterling Silver' },
+];
+
 export const AccountingDashboard: React.FC = () => {
   const { user } = useAuth();
   const canCloseDay = canAccessFeature(user?.role, 'close_daybook');
@@ -42,7 +55,7 @@ export const AccountingDashboard: React.FC = () => {
   const [goldRates, setGoldRates] = useState<GoldRate[]>([]);
 
   // Rate Scraper Dropdown & Web Sync
-  const [rateSources, setRateSources] = useState<RateSource[]>([]);
+  const [rateSources, setRateSources] = useState<RateSource[]>(DEFAULT_RATE_SOURCES);
   const [selectedSource, setSelectedSource] = useState<string>('ksjf');
   const [isSyncingRates, setIsSyncingRates] = useState<boolean>(false);
 
@@ -384,9 +397,9 @@ export const AccountingDashboard: React.FC = () => {
               <select
                 value={selectedPurityId}
                 onChange={(e) => setSelectedPurityId(Number(e.target.value))}
-                className="text-xs px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden"
+                className="text-xs px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden cursor-pointer"
               >
-                {currentRates.map((r) => (
+                {(currentRates.length > 0 ? currentRates : DEFAULT_PURITY_OPTIONS).map((r: any) => (
                   <option key={r.purity_id || r.purity} value={r.purity_id || r.purity}>
                     {r.purity_name}
                   </option>

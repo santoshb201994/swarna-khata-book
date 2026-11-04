@@ -85,9 +85,19 @@ class JWTAuth(HttpBearer):
 
         # Multi-Tenant Isolation Enforcement:
         # Route to the tenant schema encoded in the signed token, or public for platform superadmin
-        if token_schema and token_schema != 'public':
-            if curr_schema != token_schema:
-                tenant = get_tenant_model().objects.filter(schema_name=token_schema).first()
+        effective_schema = token_schema
+        if is_super and (not effective_schema or effective_schema == 'public'):
+            hint_hdr = request.headers.get('X-Tenant') or request.META.get('HTTP_X_TENANT')
+            if hint_hdr and hint_hdr != 'public':
+                effective_schema = hint_hdr.strip().lower()
+            elif not request.path.startswith('/api/developer/') and not request.path.startswith('/api/tenants/') and not request.path.startswith('/api/health'):
+                primary_store = get_tenant_model().objects.exclude(schema_name='public').filter(is_active=True).first()
+                if primary_store:
+                    effective_schema = primary_store.schema_name
+
+        if effective_schema and effective_schema != 'public':
+            if curr_schema != effective_schema:
+                tenant = get_tenant_model().objects.filter(schema_name=effective_schema).first()
                 if not tenant:
                     return None
                 connection.set_tenant(tenant)
@@ -109,7 +119,7 @@ class JWTAuth(HttpBearer):
         if not user:
             return None
 
-        user.tenant_schema = token_schema or getattr(connection, 'schema_name', 'public')
+        user.tenant_schema = effective_schema or getattr(connection, 'schema_name', 'public')
         request.user = user
         return user
 

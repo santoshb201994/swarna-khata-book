@@ -165,6 +165,13 @@ class TenantResolver:
                     )
 
             target_schema = token_schema or public_schema
+            if is_super and (not target_schema or target_schema == public_schema):
+                if hint_schema and hint_schema != public_schema:
+                    target_schema = hint_schema
+                elif not cls.is_exempt_path(request.path):
+                    primary_store = tenant_model.objects.exclude(schema_name=public_schema).filter(is_active=True).first()
+                    if primary_store:
+                        target_schema = primary_store.schema_name
 
             # Retrieve Tenant from allowlist (database)
             tenant = tenant_model.objects.filter(schema_name=target_schema).first()

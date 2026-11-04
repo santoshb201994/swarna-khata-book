@@ -342,15 +342,15 @@
     "semantic_hash": ""
   },
   "frontend/src/context/AuthContext.tsx": {
-    "mtime": 1793768534.359489,
-    "seen": 1793768543.4408474,
-    "ast_hash": "a82c7035b27c069ef1e853e1d2eb7a57",
+    "mtime": 1793812880.950175,
+    "seen": 1793812888.870407,
+    "ast_hash": "8f0c630ba5d15a211ab15593733ed574",
     "semantic_hash": ""
   },
   "frontend/src/features/accounting/AccountingDashboard.tsx": {
-    "mtime": 1793197755.1103635,
-    "seen": 1793197762.3869746,
-    "ast_hash": "d86a671c55eb5103843c375603959c55",
+    "mtime": 1793813466.0249488,
+    "seen": 1793813467.8926144,
+    "ast_hash": "3f6d561c9b71e78ad3c4cef9efdee559",
     "semantic_hash": ""
   },
   "frontend/src/features/auth/Login.tsx": {
@@ -372,15 +372,15 @@
     "semantic_hash": "5e68b2cfea13eb053c98228fadb8b424"
   },
   "frontend/src/features/products/ProductFormModal.tsx": {
-    "mtime": 1793810591.1746116,
-    "seen": 1793810600.0748188,
-    "ast_hash": "1f6f6dd3931324e355c9cfa525febf36",
+    "mtime": 1793812981.8429358,
+    "seen": 1793812990.7458625,
+    "ast_hash": "80cdab9ae02e8a546319584d5a2001ee",
     "semantic_hash": ""
   },
   "frontend/src/features/products/ProductList.tsx": {
-    "mtime": 1793810417.4290473,
-    "seen": 1793810426.4189622,
-    "ast_hash": "7b927f4ebf2e51a8cb17e431d5fba1d8",
+    "mtime": 1793812993.4715993,
+    "seen": 1793813001.7859595,
+    "ast_hash": "200180ddcca4aeb4716fbbf7acecf493",
     "semantic_hash": ""
   },
   "frontend/src/features/products/QRTagModal.tsx": {
@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/auth.py": {
-    "mtime": 1793809770.0401835,
-    "seen": 1793809778.9911823,
-    "ast_hash": "b695a289431dcb797b8a3db158ee0197",
+    "mtime": 1793812683.382335,
+    "seen": 1793812692.3479397,
+    "ast_hash": "3b9cab0ff97e21faec02caf2eec3e413",
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
@@ -930,9 +930,9 @@
     "semantic_hash": ""
   },
   "frontend/e2e/dropdowns.spec.ts": {
-    "mtime": 1793106707.1711276,
-    "seen": 1793106825.3751757,
-    "ast_hash": "28238e9e815ca53c78eec387a7d647cf",
+    "mtime": 1793813483.1881962,
+    "seen": 1793813490.9803252,
+    "ast_hash": "ab7fbe5092cc5e73ced1b8ba5933a9a4",
     "semantic_hash": ""
   },
   "frontend/src/utils/rbac.ts": {
@@ -1032,9 +1032,9 @@
     "semantic_hash": ""
   },
   "frontend/e2e/product_form_validation.spec.ts": {
-    "mtime": 1793201969.6731658,
-    "seen": 1793201976.3626783,
-    "ast_hash": "e6ba661ef51e015553ca5a3c403f76de",
+    "mtime": 1793813565.2628362,
+    "seen": 1793813573.0722754,
+    "ast_hash": "2705216e7a671a1478d9b80485d921fc",
     "semantic_hash": ""
   },
   "backend/apps/qr_tags/migrations/0002_tray.py": {
@@ -1146,9 +1146,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/resolver.py": {
-    "mtime": 1793768569.391739,
-    "seen": 1793768577.4776163,
-    "ast_hash": "770e7c0eea4ecdf28511aba48cdfb810",
+    "mtime": 1793812664.9412675,
+    "seen": 1793812673.9013817,
+    "ast_hash": "5122a22ff7a7502d555ecd3da9a9e3c3",
     "semantic_hash": ""
   },
   "backend/apps/tenants/provisioning.py": {

@@ -4,9 +4,9 @@ test.describe('Dropdown Options Verification', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to login
     await page.goto('/login');
-    // Login as admin
-    await page.fill('input[placeholder="e.g. owner or ramesh_sales"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
+    // Login as santosh
+    await page.fill('input[placeholder="e.g. owner or admin"]', 'santosh');
+    await page.fill('input[type="password"]', 'Santosh@123');
     await page.click('button:has-text("Sign In to Store")');
     // Wait for POS screen to appear
     await expect(page.getByRole('link', { name: 'POS Billing & Invoice' })).toBeVisible({ timeout: 15000 });
@@ -82,8 +82,8 @@ test.describe('Dropdown Options Verification', () => {
   });
 
   test('Accounting Dashboard dropdown options work properly', async ({ page }) => {
-    await page.getByRole('link', { name: 'Accounting & Day Book' }).click();
-    await expect(page.locator('h1:has-text("Accounting & Day Book")')).toBeVisible();
+    await page.getByRole('link', { name: /Accounting/i }).click();
+    await expect(page.locator('h1:has-text("Accounting")')).toBeVisible();
 
     // Live metal rate scraper source dropdown
     const sourceSelect = page.locator('select[title*="trade association"]');

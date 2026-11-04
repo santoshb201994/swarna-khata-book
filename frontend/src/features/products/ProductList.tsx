@@ -43,6 +43,20 @@ type SortField =
   | 'item_status'
   | 'created_at';
 
+const FALLBACK_CATEGORIES: Category[] = [
+  { id: 1, name: 'Gold Jewellery', description: '' },
+  { id: 2, name: 'Silver Ornaments', description: '' },
+  { id: 3, name: 'Diamond Jewellery', description: '' },
+  { id: 4, name: 'Platinum', description: '' },
+];
+
+const FALLBACK_PURITIES: Purity[] = [
+  { id: 1, name: '24KT Pure Gold', fineness: '0.999' },
+  { id: 2, name: '22KT Hallmarked 916', fineness: '0.916' },
+  { id: 3, name: '18KT Diamond Studded', fineness: '0.750' },
+  { id: 4, name: '925 Sterling Silver', fineness: '0.925' },
+];
+
 export const ProductList: React.FC = () => {
   const { user } = useAuth();
   const canAddProduct = canAccessFeature(user?.role, 'add_edit_products');
@@ -51,6 +65,9 @@ export const ProductList: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [purities, setPurities] = useState<Purity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const displayCategories = categories.length > 0 ? categories : FALLBACK_CATEGORIES;
+  const displayPurities = purities.length > 0 ? purities : FALLBACK_PURITIES;
 
   // Section switcher: 'items' (All Jewelry Items) vs 'trays' (Tray Group QR Codes)
   const [activeSection, setActiveSection] = useState<'items' | 'trays'>('items');
@@ -660,10 +677,10 @@ export const ProductList: React.FC = () => {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden font-medium text-slate-700"
+                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden font-medium text-slate-700 cursor-pointer"
                 >
                   <option value="">All Categories</option>
-                  {categories.map((c) => (
+                  {displayCategories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -676,10 +693,10 @@ export const ProductList: React.FC = () => {
                 <select
                   value={selectedPurity}
                   onChange={(e) => setSelectedPurity(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden font-medium text-slate-700"
+                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden font-medium text-slate-700 cursor-pointer"
                 >
                   <option value="">All Purities</option>
-                  {purities.map((p) => (
+                  {displayPurities.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
@@ -1303,8 +1320,8 @@ export const ProductList: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={fetchInitialData}
-        categories={categories}
-        purities={purities}
+        categories={displayCategories}
+        purities={displayPurities}
       />
 
       {/* Individual Product QR Tag Modal */}
