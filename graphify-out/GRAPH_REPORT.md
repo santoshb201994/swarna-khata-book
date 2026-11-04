@@ -1,7 +1,7 @@
-# Graph Report - swarna_khata_book  (2026-11-04)
+# Graph Report - swarna_khata_book  (2026-11-05)
 
 ## Corpus Check
-- 213 files · ~106,691 words
+- 213 files · ~106,624 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .bat 3, .css 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `5446f5f9`
+- Built from commit: `2b6de1dd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -356,7 +356,7 @@ Nodes (29): Item, Meta, Status, record_stock_movement(), add_sale_payment(), can
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `User` connect `Branch` to `products_router.py`, `create_token`, `MultiSourceGoldRateScraperTestCase`, `ProductValidationTestCase`, `InvoiceSettingsTestCase`, `validate_password_policy`, `ProductionHardeningArchitectureTestCase`, `BrevoPasswordResetIntegrationTestCase`, `django_db`, `tenants_router.py`, `NinjaAuthTestCase`, `Purity`, `bills_router.py`, `auth_router.py`, `tenants_router.py`, `NinjaPOSBillingTestCase`, `DataExportTestCase`, `DayBookAccountingTestCase`, `UnifiedQRArchitectureTestCase`, `SecurityAuditAndAccessControlTestCase`, `TrayQRTagsTestCase`, `resolver.py`, `Client`, `EndpointsAuthAndBranchesTestCase`, `DayBook`, `EndpointsProductsQrAndStockTestCase`, `export_tenant_data_to_zip`, `JWTAuth`, `EndpointsAccountingAndDaybookTestCase`, `backup_service.py`, `EndpointsBillingPosAndExportTestCase`, `billing_router.py`?**
-  _High betweenness centrality (0.088) - this node is a cross-community bridge._
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
 - **Are the 40 inferred relationships involving `Client` (e.g. with `check_global_username_uniqueness()` and `export_tenant_data_to_zip()`) actually correct?**
   _`Client` has 40 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `swarna-khata-book` to the rest of the system?**

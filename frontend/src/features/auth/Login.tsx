@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles, ArrowRight, ShieldCheck, Store, UserPlus, Building2, Eye, EyeOff, Mail, KeyRound, CheckCircle2, RotateCw } from 'lucide-react';
+import { Sparkles, ArrowRight, Store, UserPlus, Building2, Eye, EyeOff, Mail, KeyRound, CheckCircle2, RotateCw } from 'lucide-react';
 import api from '../../api/client';
 import { PasswordPolicyChecklist } from '../../components/PasswordPolicyChecklist';
 import { validatePasswordPolicy } from '../../utils/passwordPolicy';
@@ -465,26 +465,6 @@ export const Login: React.FC = () => {
               <span>{isSubmitting ? 'Signing in...' : 'Sign In to Store'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-
-            {/* Single Temporary Test Account Helper */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-700">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>
-                  <b>Test Account:</b> <code className="font-bold bg-slate-200 px-1 py-0.5 rounded text-slate-800">admin</code> / <code className="font-bold bg-slate-200 px-1 py-0.5 rounded text-slate-800">admin123</code>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('admin');
-                  setPassword('admin123');
-                }}
-                className="text-amber-700 hover:text-amber-800 font-bold underline cursor-pointer text-xs ml-2"
-              >
-                Auto Fill
-              </button>
-            </div>
           </form>
         )}
 

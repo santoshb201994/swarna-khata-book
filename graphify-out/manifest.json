@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "frontend/src/features/auth/Login.tsx": {
-    "mtime": 1793632520.9388123,
-    "seen": 1793632529.30134,
-    "ast_hash": "5ca2bddb36d5d377fcf470a029e78a94",
+    "mtime": 1793825737.3072999,
+    "seen": 1793825745.293931,
+    "ast_hash": "32a57557d6f1a8151251c0c9b4f8b187",
     "semantic_hash": ""
   },
   "frontend/src/features/billing/POSScreen.tsx": {
