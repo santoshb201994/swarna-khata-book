@@ -196,6 +196,8 @@ def check_global_username_uniqueness(
                         _(f"Username '{clean_username}' is already in use by store '{tenant.name}'."),
                         code='username_taken'
                     )
+        except ValidationError:
+            raise
         except Exception:
             # If a schema is mid-provisioning or table uninitialized, skip safely
             continue
