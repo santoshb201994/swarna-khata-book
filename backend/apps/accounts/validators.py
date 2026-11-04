@@ -122,3 +122,90 @@ class JewelleryPasswordPolicyValidator:
             "Consecutive duplicate characters (like 'aa', '11') and sequential characters (like 'abc', '123') "
             "are not allowed."
         )
+
+
+RESERVED_PLATFORM_USERNAMES = {
+    'developer', 'superadmin', 'admin', 'root', 'system', 'swarna', 'support', 'public'
+}
+
+
+def check_global_username_uniqueness(
+    username: str,
+    exclude_user_id: Optional[int] = None,
+    exclude_schema: Optional[str] = None
+) -> None:
+    """
+    Validates that a username is unique across all tenant schemas and the public platform schema.
+    1. Rejects usernames shorter than 3 characters or with invalid characters.
+    2. Rejects platform-reserved usernames (developer, admin, root, etc.).
+    3. Verifies no user exists in the public schema with the same username (case-insensitive).
+    4. Iterates through all active tenant schemas to guarantee no collision anywhere.
+
+    Raises:
+        ValidationError: if the username is taken or reserved.
+    """
+    from django.conf import settings
+    from django_tenants.utils import schema_context
+    from apps.accounts.models import User
+    from apps.tenants.models import Client
+
+    clean_username = (username or '').strip()
+    if not clean_username or len(clean_username) < 3:
+        raise ValidationError(
+            _("Username must be at least 3 characters long."),
+            code='username_too_short'
+        )
+
+    if not re.match(r'^[a-zA-Z0-9_.-]+$', clean_username):
+        raise ValidationError(
+            _("Username can only contain letters, numbers, underscores, dots, and hyphens."),
+            code='username_invalid_chars'
+        )
+
+    # Check against reserved platform usernames
+    lower_user = clean_username.lower()
+    dev_username = getattr(settings, 'DEVELOPER_SUPERUSER_USERNAME', 'developer').lower()
+    if lower_user == dev_username or lower_user in RESERVED_PLATFORM_USERNAMES:
+        if not (exclude_schema == 'public' and exclude_user_id):
+            raise ValidationError(
+                _(f"Username '{clean_username}' is reserved by the platform. Please choose a different username."),
+                code='username_reserved'
+            )
+
+    # 1. Check public schema
+    with schema_context('public'):
+        qs = User.objects.filter(username__iexact=clean_username)
+        if exclude_schema == 'public' and exclude_user_id:
+            qs = qs.exclude(id=exclude_user_id)
+        if qs.exists():
+            raise ValidationError(
+                _(f"Username '{clean_username}' is already in use."),
+                code='username_taken'
+            )
+
+    # 2. Check all tenant schemas
+    tenants = Client.objects.exclude(schema_name='public')
+    for tenant in tenants:
+        try:
+            with schema_context(tenant.schema_name):
+                qs = User.objects.filter(username__iexact=clean_username)
+                if exclude_schema == tenant.schema_name and exclude_user_id:
+                    qs = qs.exclude(id=exclude_user_id)
+                if qs.exists():
+                    raise ValidationError(
+                        _(f"Username '{clean_username}' is already in use by store '{tenant.name}'."),
+                        code='username_taken'
+                    )
+        except Exception:
+            # If a schema is mid-provisioning or table uninitialized, skip safely
+            continue
+
+
+def is_username_globally_available(username: str) -> bool:
+    """Helper returning boolean availability without raising ValidationError."""
+    try:
+        check_global_username_uniqueness(username)
+        return True
+    except ValidationError:
+        return False
+

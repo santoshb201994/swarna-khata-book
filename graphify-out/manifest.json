@@ -300,9 +300,9 @@
     "semantic_hash": "332486887972c5593d07908a58c82284"
   },
   "backend/seed_data.py": {
-    "mtime": 1793768332.2240217,
-    "seen": 1793768340.848671,
-    "ast_hash": "a5e448565caaea63f413868dad060d5f",
+    "mtime": 1793793003.3947759,
+    "seen": 1793793011.8225644,
+    "ast_hash": "c47bc460f85c0594a39bba1c4e8bda6a",
     "semantic_hash": ""
   },
   "backend/test_mvp.py": {
@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/auth.py": {
-    "mtime": 1793550612.6687388,
-    "seen": 1793550620.8370707,
-    "ast_hash": "bc4abb3d3ea49d5f1930cbf8c4ada525",
+    "mtime": 1793794200.6783311,
+    "seen": 1793794208.7747483,
+    "ast_hash": "42879dc600d42e5bec579baef5fe046a",
     "semantic_hash": ""
   },
   "backend/ninja_api/schemas.py": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/auth_router.py": {
-    "mtime": 1793632216.8746395,
-    "seen": 1793632225.0185478,
-    "ast_hash": "95487bfd4cb7c8fa69140c0c06b52f9a",
+    "mtime": 1793793277.9587784,
+    "seen": 1793793286.5925858,
+    "ast_hash": "45a58c601bf957df2b7cd0ade22ef2e9",
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/products_router.py": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "backend/ninja_api/routers/tenants_router.py": {
-    "mtime": 1793768316.006019,
-    "seen": 1793768324.5173972,
-    "ast_hash": "8f95718612c220708294e9855b630127",
+    "mtime": 1793793310.5911717,
+    "seen": 1793793319.1903255,
+    "ast_hash": "1d4c767662c80d7fa183fc627eca3ce2",
     "semantic_hash": ""
   },
   "backend/ninja_api/api.py": {
@@ -780,9 +780,9 @@
     "semantic_hash": ""
   },
   "backend/apps/accounts/validators.py": {
-    "mtime": 1792852291.7855163,
-    "seen": 1792852298.2054334,
-    "ast_hash": "60ddf1822e51260124df93fca68db0f8",
+    "mtime": 1793793226.5668006,
+    "seen": 1793793235.032996,
+    "ast_hash": "b3ac2ddc168c3df84b3902c5a291ef05",
     "semantic_hash": ""
   },
   "backend/tests/test_password_policy.py": {
@@ -822,15 +822,15 @@
     "semantic_hash": ""
   },
   "backend/tests/test_developer_portal.py": {
-    "mtime": 1793768365.0975306,
-    "seen": 1793768373.8440466,
-    "ast_hash": "43a72de6ad10ab88d3ef0020549b85ea",
+    "mtime": 1793794241.106034,
+    "seen": 1793794249.9358542,
+    "ast_hash": "f04b6da25df502f3fe174e64b9e0b8de",
     "semantic_hash": ""
   },
   "frontend/src/features/developer/DeveloperPortal.tsx": {
-    "mtime": 1793128838.7376792,
-    "seen": 1793128845.9330492,
-    "ast_hash": "c2050e240618015640690719c7d7365d",
+    "mtime": 1793793362.2965658,
+    "seen": 1793793371.1010544,
+    "ast_hash": "be34f8d3779ebfb199efdae89ca1be9c",
     "semantic_hash": ""
   },
   ".agents/rules/verify-before-complete.md": {
@@ -1152,9 +1152,9 @@
     "semantic_hash": ""
   },
   "backend/apps/tenants/provisioning.py": {
-    "mtime": 1793721513.9648314,
-    "seen": 1793721522.243306,
-    "ast_hash": "dd2fa7cc29a1f0ee9983aedf0642c0f7",
+    "mtime": 1793793245.534423,
+    "seen": 1793793253.6856349,
+    "ast_hash": "90a19eae482351730c234ef4c3d02abe",
     "semantic_hash": ""
   },
   "backend/apps/tenants/migrator.py": {

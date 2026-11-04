@@ -62,21 +62,26 @@ class DeveloperPortalTestCase(TestCase):
 
     def test_developer_overview_forbidden_for_owner_and_staff(self):
         with schema_context(self.demo_tenant.schema_name):
+            self.owner.tenant_schema = self.demo_tenant.schema_name
             owner_tok = create_token(self.owner, token_type='access')
-            res = self.client.get(
-                '/api/developer/overview/',
-                HTTP_AUTHORIZATION=f'Bearer {owner_tok}',
-                HTTP_X_TENANT='demo'
-            )
-            self.assertEqual(res.status_code, 403)
 
+        res = self.client.get(
+            '/api/developer/overview/',
+            HTTP_AUTHORIZATION=f'Bearer {owner_tok}',
+            HTTP_X_TENANT='demo'
+        )
+        self.assertEqual(res.status_code, 403)
+
+        with schema_context(self.demo_tenant.schema_name):
+            self.staff.tenant_schema = self.demo_tenant.schema_name
             staff_tok = create_token(self.staff, token_type='access')
-            res = self.client.get(
-                '/api/developer/overview/',
-                HTTP_AUTHORIZATION=f'Bearer {staff_tok}',
-                HTTP_X_TENANT='demo'
-            )
-            self.assertEqual(res.status_code, 403)
+
+        res = self.client.get(
+            '/api/developer/overview/',
+            HTTP_AUTHORIZATION=f'Bearer {staff_tok}',
+            HTTP_X_TENANT='demo'
+        )
+        self.assertEqual(res.status_code, 403)
 
     def test_developer_overview_success_for_superadmin(self):
         superadmin_tok = create_token(self.superadmin, token_type='access')
@@ -184,3 +189,61 @@ class DeveloperPortalTestCase(TestCase):
             self.assertEqual(new_res.status_code, 200)
         finally:
             settings.DEVELOPER_SUPERUSER_PASSWORD = original_pass
+
+    def test_developer_delete_tenant_cannot_delete_public(self):
+        superadmin_tok = create_token(self.superadmin, token_type='access')
+        res = self.client.delete(
+            '/api/developer/tenants/public/delete/',
+            HTTP_AUTHORIZATION=f'Bearer {superadmin_tok}'
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Cannot delete", res.json().get("error", ""))
+
+    def test_developer_delete_tenant_success(self):
+        from django.db import connection
+        with schema_context('public'):
+            temp_tenant = Client(schema_name='t_temp_test', name='Temp Store')
+            temp_tenant.auto_create_schema = False
+            temp_tenant.save()
+            with connection.cursor() as cur:
+                cur.execute('CREATE SCHEMA IF NOT EXISTS "t_temp_test";')
+            Domain.objects.create(domain='temp.swarnakhata.internal', tenant=temp_tenant, is_primary=True)
+
+        superadmin_tok = create_token(self.superadmin, token_type='access')
+        res = self.client.delete(
+            '/api/developer/tenants/t_temp_test/delete/',
+            HTTP_AUTHORIZATION=f'Bearer {superadmin_tok}'
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(Client.objects.filter(schema_name='t_temp_test').exists())
+
+    def test_register_store_rejects_duplicate_username(self):
+        res = self.client.post(
+            '/api/tenants/register-store/',
+            data=json.dumps({
+                "shop_name": "New Jewellery Store",
+                "owner_username": "shop_owner_1",
+                "owner_password": "Unique*Secur8#Key",
+                "owner_email": "new@store.com",
+                "owner_phone": "9876543210"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("already in use", res.json().get("error", "").lower())
+
+    def test_register_store_rejects_platform_reserved_username(self):
+        res = self.client.post(
+            '/api/tenants/register-store/',
+            data=json.dumps({
+                "shop_name": "Another Store",
+                "owner_username": "developer",
+                "owner_password": "Unique*Secur8#Key",
+                "owner_email": "another@store.com",
+                "owner_phone": "9876543210"
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("reserved", res.json().get("error", "").lower())
+

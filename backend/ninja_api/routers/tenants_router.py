@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 from decimal import Decimal
@@ -6,6 +7,8 @@ from django.db import connection, transaction
 from django_tenants.utils import schema_context
 from ninja import Router
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 from apps.tenants.models import Client, Domain
 from apps.accounts.models import User, Branch
@@ -35,6 +38,15 @@ def register_store(request, payload: StoreRegistrationIn):
     if len(payload.owner_username.strip()) < 3:
         return 400, {"error": "Username must be at least 3 characters long."}
 
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from apps.accounts.validators import check_global_username_uniqueness
+
+    try:
+        check_global_username_uniqueness(payload.owner_username)
+    except DjangoValidationError as val_err:
+        err_msg = val_err.message if hasattr(val_err, 'message') else str(val_err)
+        return 400, {"error": err_msg}
+
     # Extract optional Idempotency-Key header if provided by client HTTP headers
     header_idempotency = request.headers.get('Idempotency-Key') or request.META.get('HTTP_IDEMPOTENCY_KEY')
     effective_idempotency_key = (payload.idempotency_key or header_idempotency or "").strip() or None
@@ -53,6 +65,9 @@ def register_store(request, payload: StoreRegistrationIn):
             async_mode=True
         )
         return 201, result
+    except DjangoValidationError as exc:
+        err_msg = exc.message if hasattr(exc, 'message') else str(exc)
+        return 400, {"error": err_msg}
     except Exception as exc:
         return 400, {"error": f"Failed to register store: {str(exc)}"}
 
@@ -358,3 +373,42 @@ def developer_switch_store_token(request, payload: SwitchStoreIn):
         "schema_name": target_schema,
         "message": f"Switched context to tenant '{target_schema}'."
     }
+
+
+@router.delete("/developer/tenants/{schema_name}/delete/", response={200: dict, 400: dict, 403: dict}, auth=jwt_auth)
+def developer_delete_tenant(request, schema_name: str):
+    """
+    Developer endpoint: permanently delete a store tenant and drop its PostgreSQL schema.
+    Cannot delete the public platform schema.
+    """
+    require_role(request.auth, ['superadmin'])
+    if schema_name == 'public':
+        return 400, {"error": "Cannot delete the public platform schema."}
+
+    with schema_context('public'):
+        tenant = Client.objects.filter(schema_name=schema_name).first()
+        if not tenant:
+            return 400, {"error": f"Tenant schema '{schema_name}' does not exist."}
+
+        tenant_name = tenant.name
+
+        # 1. Delete associated domains
+        Domain.objects.filter(tenant=tenant).delete()
+
+        # 2. Drop the PostgreSQL schema CASCADE
+        with connection.cursor() as cursor:
+            # PostgreSQL identifier safety check
+            if not schema_name.isidentifier():
+                return 400, {"error": f"Invalid schema identifier '{schema_name}'."}
+            cursor.execute(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE;')
+
+        # 3. Delete client record
+        tenant.delete()
+
+    logger.warning("DEVELOPER_TENANT_DELETED: schema='%s' name='%s' by='%s'", schema_name, tenant_name, request.auth.username)
+    return 200, {
+        "success": True,
+        "schema_name": schema_name,
+        "message": f"Tenant store '{tenant_name}' ({schema_name}) has been permanently deleted."
+    }
+

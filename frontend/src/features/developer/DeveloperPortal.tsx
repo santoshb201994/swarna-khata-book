@@ -18,6 +18,7 @@ import {
   Calendar,
   Loader2,
   HardDriveDownload,
+  Trash2,
 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -184,6 +185,21 @@ export const DeveloperPortal: React.FC = () => {
       fetchOverview();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update tenant status');
+    }
+  };
+
+  const handleDeleteTenant = async (schema: string, name: string) => {
+    const confirmation = window.confirm(
+      `ARE YOU SURE you want to PERMANENTLY DELETE store "${name}" (schema: ${schema})?\n\nThis will permanently DROP the PostgreSQL database schema, users, and all inventory records. This action CANNOT be undone!`
+    );
+    if (!confirmation) return;
+
+    try {
+      await api.delete(`/developer/tenants/${schema}/delete/`);
+      toast.success(`Store "${name}" (${schema}) has been permanently deleted.`);
+      fetchOverview();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to delete store');
     }
   };
 
@@ -560,6 +576,15 @@ export const DeveloperPortal: React.FC = () => {
                     >
                       <span>Enter Store as Superadmin</span>
                       <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteTenant(tenant.schema_name, tenant.name)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-500/40"
+                      title="Permanently drop PostgreSQL schema and delete tenant"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Delete Store</span>
                     </button>
                   </div>
                 </div>

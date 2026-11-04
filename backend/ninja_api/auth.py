@@ -97,6 +97,8 @@ class JWTAuth(HttpBearer):
             with schema_context('public'):
                 user = User.objects.select_related('branch').filter(id=user_id, is_active=True).first()
             if user:
+                if not (user.is_superuser or user.role == 'superadmin'):
+                    return None
                 user.role = 'superadmin'
 
         if not user:

@@ -220,8 +220,14 @@ def create_user(request, payload: UserCreateIn):
     if target_level >= caller_level and not request.auth.is_superuser:
         return 400, {"error": f"Hierarchy violation: Your role '{caller_role}' cannot create accounts with role '{payload.role}'."}
 
-    if User.objects.filter(username=payload.username).exists():
-        return 400, {"error": f"Username '{payload.username}' is already taken."}
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from apps.accounts.validators import check_global_username_uniqueness
+
+    try:
+        check_global_username_uniqueness(payload.username)
+    except DjangoValidationError as val_err:
+        err_msg = val_err.message if hasattr(val_err, 'message') else str(val_err)
+        return 400, {"error": err_msg}
 
     user = User(
         username=payload.username,

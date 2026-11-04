@@ -99,6 +99,10 @@ class TenantProvisioningService:
                     logger.info("Retrying previously failed provisioning for '%s' (key: %s)", existing.name, idempotency_key)
                     return cls.retry_provisioning(existing.id, owner_password)
 
+        # 1.5 Global Username Uniqueness Check across all schemas & platform
+        from apps.accounts.validators import check_global_username_uniqueness
+        check_global_username_uniqueness(owner_username)
+
         schema_name = generate_schema_name(shop_name)
         domain_host = f"{schema_name}.swarnakhata.internal"
 
